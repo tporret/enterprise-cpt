@@ -1,0 +1,21 @@
+{
+  "slug": "product",
+  "args": {
+    "label": "Products",
+    "labels": {
+      "name": "Products",
+      "singular_name": "Product",
+      "add_new_item": "Add New Product",
+      "edit_item": "Edit Product",
+      "new_item": "New Product",
+      "view_item": "View Product",
+      "search_items": "Search Products",
+      "not_found": "No products found"
+    },
+    "public": true,
+    "show_in_rest": true,
+    "delete_with_user": false,
+    "menu_icon": "dashicons-products",
+    "supports": ["title", "editor", "excerpt", "thumbnail"]
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "enterprise-cpt",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "npm run build:index && npm run build:editor && npm run build:cpt-manager",
+    "build:index": "wp-scripts build ./assets/src/index.js --output-path=./assets/build/index --output-filename=index.js",
+    "build:editor": "wp-scripts build ./assets/src/editor/index.js --output-path=./assets/build/editor --output-filename=editor.js",
+    "build:cpt-manager": "wp-scripts build ./assets/src/cpt-manager/index.js --output-path=./assets/build/cpt-manager --output-filename=cpt-manager.js",
+    "start": "npm run start:index",
+    "start:index": "wp-scripts start ./assets/src/index.js --output-path=./assets/build/index --output-filename=index.js",
+    "start:editor": "wp-scripts start ./assets/src/editor/index.js --output-path=./assets/build/editor --output-filename=editor.js",
+    "start:cpt-manager": "wp-scripts start ./assets/src/cpt-manager/index.js --output-path=./assets/build/cpt-manager --output-filename=cpt-manager.js"
+  },
+  "devDependencies": {
+    "@wordpress/components": "^32.5.0",
+    "@wordpress/data": "^10.43.0",
+    "@wordpress/element": "^6.43.0",
+    "@wordpress/scripts": "^30.27.0"
+  }
+}

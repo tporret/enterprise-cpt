@@ -1,0 +1,41 @@
+<?php
+
+declare(strict_types=1);
+
+namespace EnterpriseCPT\Location;
+
+use EnterpriseCPT\Location\Rules\PostTypeRule;
+use EnterpriseCPT\Location\Rules\TaxonomyRule;
+use EnterpriseCPT\Location\Rules\UserRoleRule;
+
+final class RuleFactory
+{
+    /**
+     * @var array<string, class-string<RuleInterface>>
+     */
+    private array $map = [
+        'post_type' => PostTypeRule::class,
+        'taxonomy' => TaxonomyRule::class,
+        'user_role' => UserRoleRule::class,
+    ];
+
+    public function supports(string $param): bool
+    {
+        return isset($this->map[$param]);
+    }
+
+    public function create(array $rule): ?RuleInterface
+    {
+        $param = sanitize_key((string) ($rule['param'] ?? ''));
+        $operator = (string) ($rule['operator'] ?? '==');
+        $value = sanitize_key((string) ($rule['value'] ?? ''));
+
+        if (! $this->supports($param) || $value === '') {
+            return null;
+        }
+
+        $className = $this->map[$param];
+
+        return new $className($operator, $value);
+    }
+}

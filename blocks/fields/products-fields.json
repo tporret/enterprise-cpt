@@ -1,0 +1,41 @@
+{
+  "type": "field_group",
+  "name": "product_fields",
+  "title": "Product Fields",
+  "post_type": "product",
+  "location_rules": [
+    {
+      "param": "post_type",
+      "operator": "==",
+      "value": "product"
+    }
+  ],
+  "custom_table_name": "enterprise_cpt_products",
+  "fields": [
+    {
+      "type": "text",
+      "name": "enterprise_cpt_sku",
+      "label": "SKU",
+      "help": "Primary stock keeping unit for the product record.",
+      "show_in_rest": true,
+      "single": true,
+      "default": ""
+    },
+    {
+      "type": "repeater",
+      "name": "enterprise_cpt_variants",
+      "label": "Variants",
+      "show_in_rest": true,
+      "rows": [
+        {
+          "name": "variant_name",
+          "type": "text"
+        },
+        {
+          "name": "price",
+          "type": "number"
+        }
+      ]
+    }
+  ]
+}

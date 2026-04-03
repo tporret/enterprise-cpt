@@ -1,0 +1,52 @@
+# Composer dependencies
+/vendor/
+
+# Node dependencies and build
+/node_modules/
+npm-debug.log
+yarn-error.log
+
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.directory
+
+# IDE files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+.env.local
+.env.*.local
+
+# WordPress / Project-specific
+.wp-cli/
+wp-content/
+wp-includes/
+wp-admin/
+wp-config.php
+wp-config-sample.php
+
+# Build and compiled assets (pre-built are committed)
+# Uncomment if you want to exclude build output (not recommended for this project)
+# /assets/build/
+
+# Logs
+*.log
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# Package manager lock files (decide based on your workflow)
+# composer.lock  # Uncomment if you want developers to pin versions
+# package-lock.json  # Uncomment if you want developers to pin versions

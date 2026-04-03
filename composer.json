@@ -1,0 +1,13 @@
+{
+  "name": "enterprise-cpt/enterprise-cpt",
+  "description": "JSON-first CPT and field engine for enterprise WordPress projects.",
+  "type": "wordpress-plugin",
+  "require": {
+    "php": "^8.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "EnterpriseCPT\\": "src/"
+    }
+  }
+}
