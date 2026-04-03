@@ -21,6 +21,7 @@ Thumbs.db
 *.sublime-workspace
 .env.local
 .env.*.local
+.docs/
 
 # WordPress / Project-specific
 .wp-cli/
