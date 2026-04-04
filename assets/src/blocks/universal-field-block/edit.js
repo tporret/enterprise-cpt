@@ -23,6 +23,7 @@ import { useBlockProps, BlockControls } from '@wordpress/block-editor';
 import { ToolbarGroup, ToolbarButton } from '@wordpress/components';
 import { pencil } from '@wordpress/icons';
 import { v4 as uuidv4 } from './uuid';
+import LivePreview from './components/LivePreview';
 
 const config = window.enterpriseCptEditor || { fieldGroups: [] };
 
@@ -261,7 +262,7 @@ export default function Edit({ name, attributes, setAttributes }) {
                 </Placeholder>
             )}
 
-            {/* Summary Card when data exists */}
+            {/* SSR Live Preview when data exists */}
             {hasData && (
                 <div
                     style={{
@@ -277,7 +278,7 @@ export default function Edit({ name, attributes, setAttributes }) {
                                 display: 'flex',
                                 justifyContent: 'space-between',
                                 alignItems: 'center',
-                                marginBottom: summaryItems.length ? 12 : 0,
+                                marginBottom: 12,
                             }}
                         >
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -291,18 +292,7 @@ export default function Edit({ name, attributes, setAttributes }) {
                             </Button>
                         </div>
 
-                        {summaryItems.length > 0 && (
-                            <ul style={{ margin: 0, paddingLeft: 16, fontSize: 13, color: '#50575e' }}>
-                                {summaryItems.map((item, i) => (
-                                    <li key={i}>{item}</li>
-                                ))}
-                                {fields.length > 4 && (
-                                    <li style={{ fontStyle: 'italic' }}>
-                                        +{fields.length - 4} more field(s)
-                                    </li>
-                                )}
-                            </ul>
-                        )}
+                        <LivePreview blockName={slug} attributes={attributes} />
                     </CardBody>
                 </div>
             )}

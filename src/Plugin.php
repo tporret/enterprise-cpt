@@ -15,6 +15,7 @@ use EnterpriseCPT\Engine\FieldGroups;
 use EnterpriseCPT\Location\Compiler;
 use EnterpriseCPT\Location\Evaluator;
 use EnterpriseCPT\Location\RuleFactory;
+use EnterpriseCPT\Rest\BlockRendererController;
 use EnterpriseCPT\Rest\CPTController;
 use EnterpriseCPT\Rest\FieldGroupController;
 use EnterpriseCPT\Storage\Hydrator;
@@ -38,6 +39,8 @@ final class Plugin
     private FieldGroupController $fieldGroupController;
 
     private CPTController $cptController;
+
+    private BlockRendererController $blockRendererController;
 
     private Compiler $locationCompiler;
 
@@ -80,6 +83,7 @@ final class Plugin
         $this->fieldRegistrar = new FieldRegistrar();
         $this->fieldGroupController = new FieldGroupController($this->fieldGroupEngine);
         $this->cptController = new CPTController($this->cptEngine, ENTERPRISE_CPT_PATH . 'definitions/cpt');
+        $this->blockRendererController = new BlockRendererController();
         $this->locationCompiler = new Compiler(
             $this->fieldGroupEngine,
             new RuleFactory(),
@@ -341,6 +345,7 @@ final class Plugin
     {
         $this->fieldGroupController->register_routes();
         $this->cptController->register_routes();
+        $this->blockRendererController->register_routes();
     }
 
     public function registerRestFieldHooks(): void
