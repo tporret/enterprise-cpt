@@ -106,5 +106,80 @@ final class Hydrator
                 );
             }
         }
+
+        // Hydrate repeater child tables with optimized batch queries.
+        $this->hydrate_repeater_tables($postIds);
+    }
+
+    /**
+     * Batch-hydrate repeater child tables: one query per child table.
+     *
+     * Primes the object cache so subsequent get_post_meta() calls for repeater
+     * fields return data from the relational table without extra SQL.
+     *
+     * @param int[] $postIds
+     */
+    private function hydrate_repeater_tables(array $postIds): void
+    {
+        global $wpdb;
+
+        // Collect unique child tables from the meta key map.
+        $childTables = [];
+
+        foreach ($this->metaKeyMap as $mapping) {
+            if (($mapping['field_type'] ?? '') !== 'repeater' || empty($mapping['child_table'])) {
+                continue;
+            }
+
+            $childTables[$mapping['child_table']] = true;
+        }
+
+        if ($childTables === []) {
+            return;
+        }
+
+        foreach (array_keys($childTables) as $childTable) {
+            $coldIds = array_filter(
+                $postIds,
+                static function (int $id) use ($childTable): bool {
+                    $found = false;
+                    wp_cache_get($childTable . '_' . $id, Schema::CACHE_GROUP, false, $found);
+
+                    return ! $found;
+                }
+            );
+
+            if ($coldIds === []) {
+                continue;
+            }
+
+            $placeholders = implode(', ', array_fill(0, count($coldIds), '%d'));
+
+            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+            $rows = $wpdb->get_results(
+                $wpdb->prepare(
+                    "SELECT * FROM `{$childTable}` WHERE `post_id` IN ({$placeholders}) ORDER BY `sort_order` ASC",
+                    ...$coldIds
+                ),
+                ARRAY_A
+            );
+
+            // Group by post_id, strip internal columns.
+            $grouped = [];
+
+            foreach (($rows ?: []) as $row) {
+                $pid = (int) $row['post_id'];
+                unset($row['id'], $row['post_id'], $row['sort_order']);
+                $grouped[$pid][] = $row;
+            }
+
+            foreach ($coldIds as $postId) {
+                wp_cache_set(
+                    $childTable . '_' . $postId,
+                    $grouped[$postId] ?? [],
+                    Schema::CACHE_GROUP
+                );
+            }
+        }
     }
 }

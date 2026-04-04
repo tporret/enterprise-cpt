@@ -85,6 +85,78 @@ final class TableManager
             $wpdb->query("ALTER TABLE `{$tableName}` ADD COLUMN `{$col}` {$type->columnSql()}");
         }
 
+        // Create child tables for repeater fields.
+        foreach ($fields as $field) {
+            if (($field['type'] ?? '') === 'repeater') {
+                $this->createOrAlterRepeaterTable($field);
+            }
+        }
+
+        return $tableName;
+    }
+
+    /**
+     * Create or update the child table for a repeater field's subfields.
+     *
+     * Table: {prefix}enterprise_repeater_{field_name}
+     * Columns: id, post_id, sort_order, + one column per subfield.
+     */
+    public function createOrAlterRepeaterTable(array $field): string
+    {
+        global $wpdb;
+
+        $fieldName = sanitize_key((string) ($field['name'] ?? ''));
+
+        if ($fieldName === '') {
+            return '';
+        }
+
+        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+
+        $tableName = $this->tableName('enterprise_repeater_' . $fieldName);
+        $charset   = $wpdb->get_charset_collate();
+        $subfields = is_array($field['rows'] ?? null) ? $field['rows'] : [];
+
+        $columnSql = '';
+
+        foreach ($subfields as $sub) {
+            $col = sanitize_key((string) ($sub['name'] ?? ''));
+
+            if ($col === '') {
+                continue;
+            }
+
+            $type       = FieldType::fromString((string) ($sub['type'] ?? 'text'));
+            $columnSql .= "  `{$col}` {$type->columnSql()},\n";
+        }
+
+        $sql = "CREATE TABLE {$tableName} (\n"
+            . "  `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,\n"
+            . "  `post_id` BIGINT(20) UNSIGNED NOT NULL,\n"
+            . "  `sort_order` INT UNSIGNED NOT NULL DEFAULT 0,\n"
+            . $columnSql
+            . "  PRIMARY KEY (`id`),\n"
+            . "  KEY `post_id` (`post_id`)\n"
+            . ") {$charset};";
+
+        dbDelta($sql);
+
+        // ALTER TABLE for columns dbDelta may have missed.
+        $existing = $this->existingColumns($tableName);
+
+        foreach ($subfields as $sub) {
+            $col = sanitize_key((string) ($sub['name'] ?? ''));
+
+            if ($col === '' || in_array($col, $existing, true)) {
+                continue;
+            }
+
+            $type = FieldType::fromString((string) ($sub['type'] ?? 'text'));
+
+            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+            $wpdb->query("ALTER TABLE `{$tableName}` ADD COLUMN `{$col}` {$type->columnSql()}");
+        }
+
         return $tableName;
     }
 

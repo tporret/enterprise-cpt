@@ -202,6 +202,12 @@ final class CPT
         $args['delete_with_user'] = $args['delete_with_user'] ?? false;
         $args['supports'] = $args['supports'] ?? ['title', 'editor'];
 
+        // Ensure custom-fields support is always present so that Gutenberg
+        // can write post meta via the REST API on any registered CPT.
+        if (! in_array('custom-fields', $args['supports'], true)) {
+            $args['supports'][] = 'custom-fields';
+        }
+
         return $args;
     }
 

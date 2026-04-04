@@ -5,6 +5,7 @@ import EmailFieldSettings from './EmailFieldSettings';
 import TrueFalseFieldSettings from './TrueFalseFieldSettings';
 import SelectFieldSettings from './SelectFieldSettings';
 import RadioFieldSettings from './RadioFieldSettings';
+import RepeaterFieldSettings from './RepeaterFieldSettings';
 
 export const FIELD_TYPE_OPTIONS = [
     { label: 'Text', value: 'text' },
@@ -14,6 +15,7 @@ export const FIELD_TYPE_OPTIONS = [
     { label: 'True/False', value: 'true_false' },
     { label: 'Select', value: 'select' },
     { label: 'Radio', value: 'radio' },
+    { label: 'Repeater', value: 'repeater' },
 ];
 
 export const FIELD_SETTINGS_COMPONENTS = {
@@ -24,6 +26,7 @@ export const FIELD_SETTINGS_COMPONENTS = {
     true_false: TrueFalseFieldSettings,
     select: SelectFieldSettings,
     radio: RadioFieldSettings,
+    repeater: RepeaterFieldSettings,
 };
 
 export function createFieldByType(type = 'text', index = 1) {
@@ -53,6 +56,16 @@ export function createFieldByType(type = 'text', index = 1) {
                 { value: 'option_2', label: 'Option 2' },
             ],
             default: '',
+        };
+    }
+
+    if (type === 'repeater') {
+        return {
+            ...base,
+            default: '[]',
+            rows: [
+                { name: 'sub_field_1', label: 'Sub Field 1', type: 'text' },
+            ],
         };
     }
 

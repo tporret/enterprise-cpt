@@ -3,10 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "npm run build:index && npm run build:editor && npm run build:cpt-manager",
+    "build": "npm run build:index && npm run build:editor && npm run build:cpt-manager && npm run build:blocks",
     "build:index": "wp-scripts build ./assets/src/index.js --output-path=./assets/build/index --output-filename=index.js",
     "build:editor": "wp-scripts build ./assets/src/editor/index.js --output-path=./assets/build/editor --output-filename=editor.js",
     "build:cpt-manager": "wp-scripts build ./assets/src/cpt-manager/index.js --output-path=./assets/build/cpt-manager --output-filename=cpt-manager.js",
+    "build:blocks": "wp-scripts build ./assets/src/blocks/universal-field-block/index.js --output-path=./assets/build/blocks --output-filename=blocks.js",
     "start": "npm run start:index",
     "start:index": "wp-scripts start ./assets/src/index.js --output-path=./assets/build/index --output-filename=index.js",
     "start:editor": "wp-scripts start ./assets/src/editor/index.js --output-path=./assets/build/editor --output-filename=editor.js",

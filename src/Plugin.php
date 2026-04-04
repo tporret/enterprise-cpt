@@ -6,6 +6,7 @@ namespace EnterpriseCPT;
 
 use EnterpriseCPT\Admin\Insights;
 use EnterpriseCPT\API\Field;
+use EnterpriseCPT\Blocks\BlockFactory;
 use EnterpriseCPT\Cli\Commands;
 use EnterpriseCPT\Cli\StorageCommands;
 use EnterpriseCPT\Core\FieldRegistrar;
@@ -60,6 +61,8 @@ final class Plugin
 
     private Field $fieldApi;
 
+    private BlockFactory $blockFactory;
+
     public static function boot(string $pluginFile): self
     {
         if (self::$instance === null) {
@@ -99,6 +102,7 @@ final class Plugin
         $this->shadowSync->register();
         $this->insights = new Insights($this);
         $this->fieldApi = new Field($this);
+        $this->blockFactory = new BlockFactory($this->fieldGroupEngine);
 
         $this->registerHooks();
     }
@@ -108,8 +112,14 @@ final class Plugin
         add_action('init', [$this, 'registerPostTypes'], 5);
         add_action('init', [$this, 'registerFields'], 6);
         add_action('init', [$this, 'maybeCompileLocationRegistry'], 7);
+        add_action('init', [$this, 'registerBlocks'], 8);
+        add_filter('the_content', [$this, 'appendFrontendFieldGroups'], 20);
+        add_filter('block_categories_all', [$this, 'registerBlockCategory'], 10, 2);
+        add_filter('rest_pre_insert_post', [$this, 'syncBlockFieldsToCustomTable'], 10, 2);
         add_action('enqueue_block_editor_assets', [$this, 'enqueueBlockEditorAssets']);
+        add_action('enqueue_block_editor_assets', [$this, 'enqueueBlockAssets']);
         add_action('rest_api_init', [$this, 'registerRestControllers']);
+        add_action('rest_api_init', [$this, 'registerRestFieldHooks']);
         add_action('admin_menu', [$this, 'registerAdminMenu']);
         add_action('admin_enqueue_scripts', [$this, 'enqueueAdminAssets']);
         add_action('cli_init', [$this, 'registerCliCommands']);
@@ -244,7 +254,7 @@ final class Plugin
 
         $this->tableManager->ensureTables($groups);
 
-        $signature = md5((string) wp_json_encode(array_column($groups, 'custom_table_name')));
+        $signature = $this->storageTableSignature($groups);
         update_option('enterprise_cpt_storage_table_signature', $signature, false);
     }
 
@@ -259,7 +269,7 @@ final class Plugin
             return;
         }
 
-        $signature = md5((string) wp_json_encode(array_column($groups, 'custom_table_name')));
+        $signature = $this->storageTableSignature($groups);
         $saved     = (string) get_option('enterprise_cpt_storage_table_signature', '');
 
         if ($signature === $saved) {
@@ -269,10 +279,73 @@ final class Plugin
         $this->ensureCustomTables();
     }
 
+    /**
+     * Build a deterministic storage schema signature from custom table names
+     * and field definitions so field edits trigger table updates.
+     */
+    private function storageTableSignature(array $groups): string
+    {
+        $signaturePayload = [];
+
+        foreach ($groups as $group) {
+            if (! is_array($group)) {
+                continue;
+            }
+
+            $tableName = sanitize_key((string) ($group['custom_table_name'] ?? ''));
+
+            if ($tableName === '') {
+                continue;
+            }
+
+            $fields = is_array($group['fields'] ?? null) ? $group['fields'] : [];
+            $fieldSignature = [];
+
+            foreach ($fields as $field) {
+                if (! is_array($field)) {
+                    continue;
+                }
+
+                $fieldName = sanitize_key((string) ($field['name'] ?? ''));
+
+                if ($fieldName === '') {
+                    continue;
+                }
+
+                $fieldSignature[] = [
+                    'name' => $fieldName,
+                    'type' => (string) ($field['type'] ?? 'text'),
+                ];
+            }
+
+            usort(
+                $fieldSignature,
+                static fn (array $a, array $b): int => strcmp($a['name'] . ':' . $a['type'], $b['name'] . ':' . $b['type'])
+            );
+
+            $signaturePayload[] = [
+                'table' => $tableName,
+                'fields' => $fieldSignature,
+            ];
+        }
+
+        usort(
+            $signaturePayload,
+            static fn (array $a, array $b): int => strcmp($a['table'], $b['table'])
+        );
+
+        return md5((string) wp_json_encode($signaturePayload));
+    }
+
     public function registerRestControllers(): void
     {
         $this->fieldGroupController->register_routes();
         $this->cptController->register_routes();
+    }
+
+    public function registerRestFieldHooks(): void
+    {
+        $this->fieldApi->register_rest_hooks($this->fieldGroupDefinitions());
     }
 
     public function registerAdminMenu(): void
@@ -450,34 +523,378 @@ final class Plugin
         $this->locationCompiler->compile();
     }
 
-    private function editorBootstrapData(): array
+    public function appendFrontendFieldGroups(string $content): string
     {
-        $textFields = [];
+        if (is_admin() || ! is_singular() || ! in_the_loop() || ! is_main_query()) {
+            return $content;
+        }
 
-        foreach ($this->fieldGroupDefinitions() as $groupDefinition) {
-            $postType = (string) ($groupDefinition['post_type'] ?? '');
-            $fields = $groupDefinition['fields'] ?? [];
+        $post = get_post();
 
-            if ($postType === '' || ! is_array($fields)) {
-                continue;
-            }
+        if (! $post instanceof \WP_Post) {
+            return $content;
+        }
 
-            foreach ($fields as $fieldDefinition) {
-                if (($fieldDefinition['type'] ?? null) !== 'text') {
-                    continue;
-                }
+        $groups = array_values(array_filter(
+            $this->fieldGroupDefinitions(),
+            static fn (array $group): bool => sanitize_key((string) ($group['post_type'] ?? '')) === $post->post_type
+        ));
 
-                $textFields[] = [
-                    'metaKey' => (string) ($fieldDefinition['name'] ?? ''),
-                    'label' => (string) ($fieldDefinition['label'] ?? $fieldDefinition['name'] ?? ''),
-                    'help' => (string) ($fieldDefinition['help'] ?? ''),
-                    'postType' => $postType,
-                ];
+        if ($groups === []) {
+            return $content;
+        }
+
+        $renderedGroups = [];
+
+        foreach ($groups as $group) {
+            $groupMarkup = $this->renderFrontendFieldGroup($group, $post->ID);
+
+            if ($groupMarkup !== '') {
+                $renderedGroups[] = $groupMarkup;
             }
         }
 
+        if ($renderedGroups === []) {
+            return $content;
+        }
+
+        $wrapper = '<section class="enterprise-cpt-frontend-fields">' . implode('', $renderedGroups) . '</section>';
+
+        return $content . $wrapper;
+    }
+
+    private function renderFrontendFieldGroup(array $group, int $postId): string
+    {
+        $fields = is_array($group['fields'] ?? null) ? $group['fields'] : [];
+        $items = [];
+
+        foreach ($fields as $field) {
+            if (! is_array($field)) {
+                continue;
+            }
+
+            $metaKey = sanitize_key((string) ($field['name'] ?? ''));
+
+            if ($metaKey === '') {
+                continue;
+            }
+
+            $value = $this->fieldApi->get($metaKey, $postId);
+            $markup = $this->renderFrontendFieldValue($field, $value);
+
+            if ($markup === '') {
+                continue;
+            }
+
+            $label = (string) ($field['label'] ?? $metaKey);
+
+            $items[] = sprintf(
+                '<div class="enterprise-cpt-frontend-field"><strong>%s</strong>%s</div>',
+                esc_html($label),
+                $markup
+            );
+        }
+
+        if ($items === []) {
+            return '';
+        }
+
+        $title = (string) ($group['title'] ?? $group['name'] ?? 'Field Group');
+
+        return sprintf(
+            '<section class="enterprise-cpt-frontend-group"><h2>%s</h2>%s</section>',
+            esc_html($title),
+            implode('', $items)
+        );
+    }
+
+    private function renderFrontendFieldValue(array $field, mixed $value): string
+    {
+        $type = (string) ($field['type'] ?? 'text');
+
+        if ($type === 'repeater') {
+            if (! is_array($value) || $value === []) {
+                return '';
+            }
+
+            // Build a lookup of subfield schemas by name for image settings.
+            $subfieldSchemas = [];
+
+            foreach (is_array($field['rows'] ?? null) ? $field['rows'] : [] as $sub) {
+                if (is_array($sub) && isset($sub['name'])) {
+                    $subfieldSchemas[(string) $sub['name']] = $sub;
+                }
+            }
+
+            $rows = [];
+
+            foreach ($value as $row) {
+                if (! is_array($row) || $row === []) {
+                    continue;
+                }
+
+                $columns = [];
+
+                foreach ($row as $columnName => $columnValue) {
+                    $sub = $subfieldSchemas[$columnName] ?? null;
+                    $subType = (string) ($sub['type'] ?? 'text');
+
+                    if ($subType === 'image') {
+                        $imageMarkup = $this->renderImageColumn($columnValue, $sub);
+
+                        $columns[] = sprintf(
+                            '<li><span>%s:</span> %s</li>',
+                            esc_html(ucwords(str_replace('_', ' ', (string) $columnName))),
+                            $imageMarkup
+                        );
+                    } else {
+                        $columns[] = sprintf(
+                            '<li><span>%s:</span> %s</li>',
+                            esc_html(ucwords(str_replace('_', ' ', (string) $columnName))),
+                            esc_html((string) $columnValue)
+                        );
+                    }
+                }
+
+                if ($columns !== []) {
+                    $rows[] = '<ul class="enterprise-cpt-frontend-repeater-row">' . implode('', $columns) . '</ul>';
+                }
+            }
+
+            return $rows === []
+                ? ''
+                : '<div class="enterprise-cpt-frontend-value enterprise-cpt-frontend-repeater">' . implode('', $rows) . '</div>';
+        }
+
+        if ($type === 'true_false') {
+            return '<div class="enterprise-cpt-frontend-value">' . esc_html($value ? 'Yes' : 'No') . '</div>';
+        }
+
+        if ($value === null || $value === '') {
+            return '';
+        }
+
+        return '<div class="enterprise-cpt-frontend-value">' . esc_html((string) $value) . '</div>';
+    }
+
+    /**
+     * Render an image attachment for the frontend, respecting image_size and image_link settings.
+     */
+    private function renderImageColumn(mixed $attachmentId, ?array $subfieldSchema): string
+    {
+        $id = (int) $attachmentId;
+
+        if ($id <= 0) {
+            return '';
+        }
+
+        $size = sanitize_key((string) ($subfieldSchema['image_size'] ?? 'medium'));
+        $link = sanitize_key((string) ($subfieldSchema['image_link'] ?? 'none'));
+
+        $imgTag = wp_get_attachment_image($id, $size ?: 'medium', false, [
+            'class' => 'enterprise-cpt-repeater-image',
+            'loading' => 'lazy',
+        ]);
+
+        if ($imgTag === '') {
+            return '';
+        }
+
+        if ($link === 'file') {
+            $url = wp_get_attachment_url($id);
+
+            if ($url) {
+                return sprintf('<a href="%s">%s</a>', esc_url($url), $imgTag);
+            }
+        }
+
+        if ($link === 'attachment') {
+            $url = get_attachment_link($id);
+
+            if ($url) {
+                return sprintf('<a href="%s">%s</a>', esc_url($url), $imgTag);
+            }
+        }
+
+        return $imgTag;
+    }
+
+    private function editorBootstrapData(): array
+    {
         return [
-            'textFields' => array_values(array_filter($textFields, static fn (array $field): bool => $field['metaKey'] !== '')),
+            'fieldGroups' => $this->fieldGroupDefinitions(),
+            'restBase'    => rest_url('enterprise-cpt/v1'),
+            'nonce'       => wp_create_nonce('wp_rest'),
         ];
+    }
+
+    // ── Block Bridge ─────────────────────────────────────────────────────
+
+    public function registerBlocks(): void
+    {
+        $this->blockFactory->register();
+    }
+
+    /**
+     * Register the "Enterprise CPT" block category.
+     */
+    public function registerBlockCategory(array $categories, mixed $context): array
+    {
+        return array_merge($categories, [
+            [
+                'slug'  => 'enterprise-cpt',
+                'title' => 'Enterprise CPT',
+                'icon'  => 'screenoptions',
+            ],
+        ]);
+    }
+
+    /**
+     * Enqueue the blocks JS bundle in the block editor.
+     */
+    public function enqueueBlockAssets(): void
+    {
+        $scriptPath = ENTERPRISE_CPT_PATH . 'assets/build/blocks/blocks.js';
+        $assetPath  = ENTERPRISE_CPT_PATH . 'assets/build/blocks/blocks.asset.php';
+
+        if (! is_readable($scriptPath) || ! is_readable($assetPath)) {
+            return;
+        }
+
+        $asset = require $assetPath;
+
+        wp_register_script(
+            'enterprise-cpt-blocks',
+            ENTERPRISE_CPT_URL . 'assets/build/blocks/blocks.js',
+            $asset['dependencies'] ?? [],
+            $asset['version'] ?? ENTERPRISE_CPT_VERSION,
+            true
+        );
+
+        wp_enqueue_script('enterprise-cpt-blocks');
+    }
+
+    /**
+     * Storage Resolver: intercept post saves and sync Enterprise Block data
+     * to the associated custom table.
+     *
+     * Parses post_content for enterprise-cpt/* blocks, extracts attributes,
+     * and upserts into the custom table keyed by block_instance_id.
+     */
+    public function syncBlockFieldsToCustomTable(\stdClass $prepared, \WP_REST_Request $request): \stdClass
+    {
+        $content = $prepared->post_content ?? '';
+
+        if ($content === '' || !str_contains($content, '<!-- wp:enterprise-cpt/')) {
+            return $prepared;
+        }
+
+        $blocks = parse_blocks($content);
+        $postId = (int) ($prepared->ID ?? 0);
+
+        if ($postId <= 0) {
+            return $prepared;
+        }
+
+        $blockGroups = array_filter(
+            $this->fieldGroupEngine->definitionList(),
+            static fn(array $g): bool => !empty($g['is_block']) && ($g['custom_table_name'] ?? '') !== '',
+        );
+
+        if ($blockGroups === []) {
+            return $prepared;
+        }
+
+        $groupsBySlug = [];
+
+        foreach ($blockGroups as $g) {
+            $groupsBySlug[$g['name']] = $g;
+        }
+
+        foreach ($blocks as $block) {
+            $blockName = $block['blockName'] ?? '';
+
+            if (!str_starts_with($blockName, 'enterprise-cpt/')) {
+                continue;
+            }
+
+            $slug = substr($blockName, strlen('enterprise-cpt/'));
+
+            if (!isset($groupsBySlug[$slug])) {
+                continue;
+            }
+
+            $group = $groupsBySlug[$slug];
+            $attrs = $block['attrs'] ?? [];
+            $instanceId = $attrs['blockInstanceId'] ?? '';
+
+            if ($instanceId === '') {
+                continue;
+            }
+
+            $this->upsertBlockData($group, $postId, $instanceId, $attrs);
+        }
+
+        return $prepared;
+    }
+
+    /**
+     * Upsert block field data into the field group's custom table.
+     */
+    private function upsertBlockData(array $group, int $postId, string $instanceId, array $attrs): void
+    {
+        global $wpdb;
+
+        $tableName = $wpdb->prefix . sanitize_key($group['custom_table_name']);
+        $fields    = is_array($group['fields'] ?? null) ? $group['fields'] : [];
+
+        // Build data for upsert.
+        $columns = ['post_id' => $postId, 'block_instance_id' => sanitize_text_field($instanceId)];
+        $formats = ['%d', '%s'];
+        $updates = [];
+
+        foreach ($fields as $field) {
+            if (!is_array($field)) {
+                continue;
+            }
+
+            $col = sanitize_key((string) ($field['name'] ?? ''));
+
+            if ($col === '' || !array_key_exists($col, $attrs)) {
+                continue;
+            }
+
+            $value = $attrs[$col];
+
+            if (is_array($value) || is_object($value)) {
+                $columns[$col] = wp_json_encode($value);
+                $formats[]     = '%s';
+            } elseif (is_numeric($value) && !is_string($value)) {
+                $columns[$col] = $value;
+                $formats[]     = is_float($value) ? '%f' : '%d';
+            } else {
+                $columns[$col] = (string) $value;
+                $formats[]     = '%s';
+            }
+
+            $updates[] = "`{$col}` = VALUES(`{$col}`)";
+        }
+
+        if ($updates === []) {
+            return;
+        }
+
+        $colNames    = implode('`, `', array_keys($columns));
+        $placeholders = implode(', ', $formats);
+        $updateClause = implode(', ', $updates);
+
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+        $wpdb->query(
+            $wpdb->prepare(
+                "INSERT INTO `{$tableName}` (`{$colNames}`) VALUES ({$placeholders})"
+                . " ON DUPLICATE KEY UPDATE {$updateClause}",
+                ...array_values($columns)
+            )
+        );
     }
 }

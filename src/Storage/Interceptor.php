@@ -47,9 +47,30 @@ final class Interceptor
             return $check;
         }
 
-        ['table' => $tableName, 'field_type' => $fieldType] = $this->metaKeyMap[$metaKey];
+        $mapping = $this->metaKeyMap[$metaKey];
+
+        // Repeater with a child table: prefer relational rows, fall back to parent column.
+        if (($mapping['field_type'] ?? '') === 'repeater' && ! empty($mapping['child_table'])) {
+            $rows = $this->fetch_repeater_rows($mapping['child_table'], $objectId);
+
+            if ($rows !== []) {
+                $json = wp_json_encode($rows);
+
+                return $single ? $json : [$json];
+            }
+
+            // Child table empty — fall through to read JSON blob from parent table.
+        }
+
+        ['table' => $tableName, 'field_type' => $fieldType] = $mapping;
 
         $row = $this->fetch_row($tableName, $objectId);
+
+        // Fall back to core postmeta when custom storage has no row/column yet.
+        if ($row === [] || ! array_key_exists($metaKey, $row)) {
+            return $check;
+        }
+
         $value = $row[$metaKey] ?? (new Schema())->get_column_default($fieldType);
 
         return $single ? $value : [$value];
@@ -69,11 +90,23 @@ final class Interceptor
             return $check;
         }
 
-        ['table' => $tableName, 'format' => $format] = $this->metaKeyMap[$metaKey];
+        $mapping = $this->metaKeyMap[$metaKey];
+        ['table' => $tableName, 'format' => $format] = $mapping;
 
-        $this->upsert_column($tableName, $objectId, $metaKey, $metaValue, $format);
+        $updated = $this->upsert_column($tableName, $objectId, $metaKey, $metaValue, $format);
 
-        return true;
+        // Sync repeater rows to the relational child table.
+        if (($mapping['field_type'] ?? '') === 'repeater' && ! empty($mapping['child_table'])) {
+            $this->sync_repeater_rows(
+                $mapping['child_table'],
+                $objectId,
+                $metaValue,
+                $mapping['subfields'] ?? []
+            );
+        }
+
+        // If custom write fails, let WordPress handle native postmeta write.
+        return $updated ? true : $check;
     }
 
     /**
@@ -92,7 +125,11 @@ final class Interceptor
 
         ['table' => $tableName, 'format' => $format] = $this->metaKeyMap[$metaKey];
 
-        $this->upsert_column($tableName, $objectId, $metaKey, $metaValue, $format);
+        $added = $this->upsert_column($tableName, $objectId, $metaKey, $metaValue, $format);
+
+        if (! $added) {
+            return $check;
+        }
 
         // Return a truthy integer to signal success to WordPress.
         return 1;
@@ -116,9 +153,9 @@ final class Interceptor
 
         $defaultValue = (new Schema())->get_column_default($fieldType);
 
-        $this->upsert_column($tableName, $objectId, $metaKey, $defaultValue, $format);
+        $deleted = $this->upsert_column($tableName, $objectId, $metaKey, $defaultValue, $format);
 
-        return true;
+        return $deleted ? true : $check;
     }
 
     // -------------------------------------------------------------------------
@@ -163,11 +200,11 @@ final class Interceptor
         string $colName,
         mixed $value,
         string $format
-    ): void {
+    ): bool {
         global $wpdb;
 
         // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnquotedComplexPlaceholder
-        $wpdb->query(
+        $result = $wpdb->query(
             $wpdb->prepare(
                 "INSERT INTO `{$tableName}` (`post_id`, `{$colName}`) VALUES (%d, {$format})"
                 . " ON DUPLICATE KEY UPDATE `{$colName}` = VALUES(`{$colName}`)",
@@ -176,7 +213,13 @@ final class Interceptor
             )
         );
 
+        if ($result === false) {
+            return false;
+        }
+
         $this->invalidate_cache($tableName, $postId);
+
+        return true;
     }
 
     private function invalidate_cache(string $tableName, int $postId): void
@@ -187,5 +230,107 @@ final class Interceptor
     private function cache_key(string $tableName, int $postId): string
     {
         return $tableName . '_' . $postId;
+    }
+
+    // -------------------------------------------------------------------------
+    // Repeater child-table helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * Read all rows from a repeater child table for a post, ordered by sort_order.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function fetch_repeater_rows(string $childTable, int $postId): array
+    {
+        global $wpdb;
+
+        $cacheKey = $this->cache_key($childTable, $postId);
+        $found    = false;
+        $cached   = wp_cache_get($cacheKey, Schema::CACHE_GROUP, false, $found);
+
+        if ($found && is_array($cached)) {
+            return $cached;
+        }
+
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT * FROM `{$childTable}` WHERE `post_id` = %d ORDER BY `sort_order` ASC",
+                $postId
+            ),
+            ARRAY_A
+        );
+
+        $rows = is_array($rows) ? $rows : [];
+
+        // Strip internal columns from the returned data.
+        $cleaned = array_map(static function (array $row): array {
+            unset($row['id'], $row['post_id'], $row['sort_order']);
+
+            return $row;
+        }, $rows);
+
+        wp_cache_set($cacheKey, $cleaned, Schema::CACHE_GROUP);
+
+        return $cleaned;
+    }
+
+    /**
+     * Replace all rows in a repeater child table for a post.
+     *
+     * DELETE + bulk INSERT inside a transaction to keep the table consistent.
+     */
+    private function sync_repeater_rows(
+        string $childTable,
+        int $postId,
+        mixed $jsonValue,
+        array $subfields
+    ): void {
+        global $wpdb;
+
+        $decoded = is_string($jsonValue) ? json_decode($jsonValue, true) : $jsonValue;
+
+        if (! is_array($decoded)) {
+            $decoded = [];
+        }
+
+        $columnNames = [];
+
+        foreach ($subfields as $sub) {
+            $col = sanitize_key((string) ($sub['name'] ?? ''));
+
+            if ($col !== '') {
+                $columnNames[] = $col;
+            }
+        }
+
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+        $wpdb->query("START TRANSACTION");
+
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+        $wpdb->query($wpdb->prepare("DELETE FROM `{$childTable}` WHERE `post_id` = %d", $postId));
+
+        foreach ($decoded as $sortOrder => $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+
+            $data    = ['post_id' => $postId, 'sort_order' => (int) $sortOrder];
+            $formats = ['%d', '%d'];
+
+            foreach ($columnNames as $col) {
+                $data[$col]  = $row[$col] ?? '';
+                $formats[]   = is_numeric($row[$col] ?? '') && ! is_string($row[$col] ?? '') ? '%d' : '%s';
+            }
+
+            $wpdb->insert($childTable, $data, $formats);
+        }
+
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+        $wpdb->query("COMMIT");
+
+        // Invalidate repeater cache.
+        wp_cache_delete($this->cache_key($childTable, $postId), Schema::CACHE_GROUP);
     }
 }

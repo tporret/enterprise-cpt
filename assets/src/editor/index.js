@@ -218,6 +218,18 @@ function MainCanvas({ group, activeFieldIndex, setActiveFieldIndex, onGroupChang
         setActiveFieldIndex(nextFields.length - 1);
     };
 
+    const deleteField = (index, event) => {
+        event.stopPropagation();
+        const nextFields = fields.filter((_, i) => i !== index);
+        onGroupChange({ ...group, fields: nextFields });
+
+        if (activeFieldIndex >= nextFields.length) {
+            setActiveFieldIndex(Math.max(0, nextFields.length - 1));
+        } else if (activeFieldIndex === index) {
+            setActiveFieldIndex(0);
+        }
+    };
+
     return (
         <main className="enterprise-cpt-canvas">
             <div className="enterprise-cpt-canvas__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -246,7 +258,18 @@ function MainCanvas({ group, activeFieldIndex, setActiveFieldIndex, onGroupChang
                         <CardBody>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <strong>{field.label || `Field ${index + 1}`}</strong>
-                                <span style={{ fontSize: 12, opacity: 0.7 }}>{field.type}</span>
+                                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                    <span style={{ fontSize: 12, opacity: 0.7 }}>{field.type}</span>
+                                    <Button
+                                        variant="tertiary"
+                                        isDestructive
+                                        isSmall
+                                        onClick={(e) => deleteField(index, e)}
+                                        style={{ minHeight: 'unset', padding: '2px 8px' }}
+                                    >
+                                        Remove
+                                    </Button>
+                                </div>
                             </div>
                             <div style={{ marginTop: 8, fontSize: 12, opacity: 0.8 }}>
                                 <code>{field.name || ''}</code>

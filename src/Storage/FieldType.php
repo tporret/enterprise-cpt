@@ -13,10 +13,15 @@ namespace EnterpriseCPT\Storage;
  */
 enum FieldType: string
 {
-    case Text     = 'text';
-    case Textarea = 'textarea';
-    case Repeater = 'repeater';
-    case Number   = 'number';
+    case Text      = 'text';
+    case Textarea  = 'textarea';
+    case Repeater  = 'repeater';
+    case Number    = 'number';
+    case Email     = 'email';
+    case Select    = 'select';
+    case Radio     = 'radio';
+    case TrueFalse = 'true_false';
+    case Image     = 'image';
 
     /**
      * Return the enum case for a given string, falling back to Text for unknown values.
@@ -32,10 +37,12 @@ enum FieldType: string
     public function columnSql(): string
     {
         return match ($this) {
-            self::Text     => "VARCHAR(255) NOT NULL DEFAULT ''",
-            self::Textarea => 'TEXT NOT NULL',
-            self::Repeater => 'LONGTEXT NOT NULL',
-            self::Number   => 'BIGINT(20) NOT NULL DEFAULT 0',
+            self::Text, self::Email, self::Select, self::Radio => "VARCHAR(255) NOT NULL DEFAULT ''",
+            self::Textarea  => 'TEXT NOT NULL',
+            self::Repeater  => 'LONGTEXT NOT NULL',
+            self::Number    => 'BIGINT(20) NOT NULL DEFAULT 0',
+            self::TrueFalse => 'TINYINT(1) NOT NULL DEFAULT 0',
+            self::Image     => 'BIGINT(20) UNSIGNED NOT NULL DEFAULT 0',
         };
     }
 
@@ -45,8 +52,8 @@ enum FieldType: string
     public function format(): string
     {
         return match ($this) {
-            self::Number => '%d',
-            default      => '%s',
+            self::Number, self::TrueFalse, self::Image => '%d',
+            default => '%s',
         };
     }
 
@@ -57,8 +64,8 @@ enum FieldType: string
     {
         return match ($this) {
             self::Repeater => '[]',
-            self::Number   => 0,
-            default        => '',
+            self::Number, self::TrueFalse, self::Image => 0,
+            default => '',
         };
     }
 }

@@ -71,6 +71,23 @@ final class FieldGroupController
                 'permission_callback' => [$this, 'can_manage'],
             ]
         );
+
+        register_rest_route(
+            self::NAMESPACE,
+            '/field-groups/for-post-type/(?P<post_type>[a-z0-9_-]+)',
+            [
+                'methods'             => 'GET',
+                'callback'            => [$this, 'get_groups_for_post_type'],
+                'permission_callback' => static fn (): bool => current_user_can('edit_posts'),
+                'args'                => [
+                    'post_type' => [
+                        'required'          => true,
+                        'type'              => 'string',
+                        'sanitize_callback' => 'sanitize_key',
+                    ],
+                ],
+            ]
+        );
     }
 
     public function get_items(): WP_REST_Response
@@ -160,6 +177,22 @@ final class FieldGroupController
     public function can_manage(): bool
     {
         return current_user_can('manage_options');
+    }
+
+    /**
+     * Return all field groups whose post_type matches the requested slug.
+     * Used by the Gutenberg post editor to load applicable groups on page load.
+     */
+    public function get_groups_for_post_type(WP_REST_Request $request): WP_REST_Response
+    {
+        $postType = sanitize_key((string) $request->get_param('post_type'));
+
+        $groups = array_values(array_filter(
+            $this->fieldGroups->definitionList(),
+            static fn (array $g): bool => sanitize_key((string) ($g['post_type'] ?? '')) === $postType
+        ));
+
+        return new WP_REST_Response($groups, 200);
     }
 
     public function search_items(WP_REST_Request $request): WP_REST_Response|WP_Error

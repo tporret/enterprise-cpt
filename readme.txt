@@ -8,7 +8,7 @@ Stable tag: 0.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Enterprise CPT is a JSON-first plugin for managing Custom Post Types and Field Groups with a modern WordPress admin UI and performance-focused storage options.
+Enterprise CPT is a JSON-first plugin for managing Custom Post Types and Field Groups with a modern WordPress admin UI, performance-focused storage options, and a native Gutenberg block bridge.
 
 == Description ==
 
@@ -37,14 +37,39 @@ You can:
 - Editor view with back navigation and field-focused sidebar settings
 - Location summary and storage badge in list table
 - Save and export field group schemas
-- Standard field types: Text, Textarea, Number, Email, True/False, Select, Radio
+- Standard field types: Text, Textarea, Number, Email, True/False, Select, Radio, Repeater
 - Type-specific settings (number ranges/step, true/false labels, select/radio choices)
+= Repeater Focus Canvas =
+
+- List view with drag-and-drop row reordering (HTML5 DnD)
+- Per-row Edit (pencil), Clone (copy), and Delete (trash) icon actions
+- Row summary shows the first subfield value
+- Centered modal titled "Editing [Row Name]" with Done / Discard Changes footer
+- Clone action triggers a "Row cloned" snackbar notification
+- Bulk image row creation from the media library
+- Inline image preview, replace, and remove controls
+
+= Field-to-Block Bridge =
+
+- Any field group can become a native Gutenberg block by adding `"is_block": true` to its JSON
+- Blocks appear in the **Enterprise CPT** block category in the inserter
+- Universal Edit component shows a canvas summary view and opens a Focus Canvas modal for editing
+- Server-side rendering via `render_callback` with theme template support: `{theme}/enterprise-cpts/blocks/{slug}.php`
+- Template receives a `$fields` stdClass object (e.g. `echo $fields->heading;`)
+- Block data is saved to the field group's custom table via `rest_pre_insert_post`, keyed by `block_instance_id`
+- Multiple blocks of the same type on one page each get an isolated row in the custom table
 
 = Performance Storage =
 
 - Optional custom table storage per field group
+- Relational repeater child-table storage in custom table mode (`wp_enterprise_repeater_{field_name}`)
 - Postmeta shadow sync support for compatibility
 - Metadata interception + cache layer for reduced query overhead
+
+= Frontend Output =
+
+- Repeater image fields render as actual images on frontend output (not raw attachment IDs)
+- Repeater rows continue to render as structured lists for content clarity
 
 = REST API =
 
@@ -96,6 +121,17 @@ No. Shadow sync and compatibility paths are included to support standard WordPre
 
 == Changelog ==
 
+= 0.2.0 =
+
+- Repeater Focus Canvas UI overhaul: drag-and-drop sorting, icon action buttons (edit/clone/delete), centered modal with Done/Discard footer, clone snackbar
+- Field-to-Block Bridge: `is_block: true` on any field group registers a Gutenberg block
+- Universal block Edit component with Focus Canvas modal and canvas summary view
+- `BlockFactory` PHP class registers blocks dynamically from field group definitions
+- Theme template support for block render callbacks (`enterprise-cpts/blocks/{slug}.php`)
+- Block storage resolver: syncs block attributes to custom table via `rest_pre_insert_post`
+- Block instance isolation via UUID `block_instance_id` per placed block
+- New `build:blocks` npm script for the blocks bundle
+
 = 0.1.0 =
 
 - CPT Manager admin UI
@@ -105,6 +141,8 @@ No. Shadow sync and compatibility paths are included to support standard WordPre
 - Custom table storage engine with metadata interception
 - Activation checks, environment guards, and admin hardening
 - Standard Field Type Library (textarea, number, email, true/false, select, radio)
+- Repeater Focus Canvas editor and repeater media bulk add workflow
+- Repeater frontend image rendering support
 
 == Upgrade Notice ==
 

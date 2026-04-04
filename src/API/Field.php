@@ -270,8 +270,111 @@ final class Field
     {
         return match ($fieldType) {
             FieldType::Number => is_numeric($value) ? (int) $value : 0,
+            FieldType::TrueFalse => (bool) $value,
+            FieldType::Image => is_numeric($value) ? (int) $value : 0,
             FieldType::Repeater => is_array($value) ? $value : json_decode((string) $value, true) ?? [],
-            FieldType::Text, FieldType::Textarea => (string) $value,
+            FieldType::Text, FieldType::Textarea, FieldType::Email, FieldType::Select, FieldType::Radio => (string) $value,
         };
+    }
+
+    // -------------------------------------------------------------------------
+    // REST API hooks
+    // -------------------------------------------------------------------------
+
+    /**
+     * Register rest_prepare_{$post_type} and rest_after_insert_{$post_type}
+     * hooks for every post type that has at least one field group.
+     */
+    public function register_rest_hooks(array $fieldGroupDefinitions): void
+    {
+        $postTypes = [];
+
+        foreach ($fieldGroupDefinitions as $group) {
+            $postType = sanitize_key((string) ($group['post_type'] ?? ''));
+
+            if ($postType !== '' && ! in_array($postType, $postTypes, true)) {
+                $postTypes[] = $postType;
+            }
+        }
+
+        foreach ($postTypes as $postType) {
+            add_filter("rest_prepare_{$postType}", [$this, 'inject_field_values'], 10, 3);
+            add_action("rest_after_insert_{$postType}", [$this, 'handle_rest_save'], 10, 3);
+        }
+    }
+
+    /**
+        * Inject custom field values into the REST meta payload so Gutenberg
+        * preloads them into the core/editor meta store on page load.
+     *
+     * Only fires for context=edit (editor requests).
+     */
+    public function inject_field_values(\WP_REST_Response $response, \WP_Post $post, \WP_REST_Request $request): \WP_REST_Response
+    {
+        if ($request->get_param('context') !== 'edit') {
+            return $response;
+        }
+
+        $fieldValues = [];
+
+        foreach ($this->plugin->fieldGroupDefinitions() as $group) {
+            if (sanitize_key((string) ($group['post_type'] ?? '')) !== $post->post_type) {
+                continue;
+            }
+
+            foreach (is_array($group['fields'] ?? null) ? $group['fields'] : [] as $field) {
+                $metaKey = sanitize_key((string) ($field['name'] ?? ''));
+
+                if ($metaKey !== '') {
+                    // Use the registered meta/get_post_meta pipeline so values
+                    // match the REST schema Gutenberg expects for each field.
+                    $fieldValues[$metaKey] = get_post_meta($post->ID, $metaKey, true);
+                }
+            }
+        }
+
+        if ($fieldValues === []) {
+            return $response;
+        }
+
+        $data = $response->get_data();
+        $meta = is_array($data['meta'] ?? null) ? $data['meta'] : [];
+
+        foreach ($fieldValues as $metaKey => $value) {
+            $meta[$metaKey] = $value;
+        }
+
+        $data['meta'] = $meta;
+        $response->set_data($data);
+
+        return $response;
+    }
+
+    /**
+     * Handle an optional enterprise_cpt_fields payload sent directly in the
+     * REST request body. Saves each field via update_post_meta so the
+     * Interceptor routes values to the correct custom table.
+     */
+    public function handle_rest_save(\WP_Post $post, \WP_REST_Request $request, bool $creating): void
+    {
+        $fields = $request->get_param('enterprise_cpt_fields');
+
+        if (! is_array($fields) || $fields === []) {
+            return;
+        }
+
+        $metaKeyMap = $this->plugin->storageSchema()->build_meta_key_map(
+            $this->plugin->fieldGroupDefinitions()
+        );
+
+        foreach ($fields as $rawKey => $value) {
+            $metaKey = sanitize_key((string) $rawKey);
+
+            if ($metaKey === '' || ! isset($metaKeyMap[$metaKey])) {
+                continue;
+            }
+
+            update_post_meta($post->ID, $metaKey, $value);
+        }
     }
 }

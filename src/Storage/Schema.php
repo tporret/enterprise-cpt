@@ -88,6 +88,11 @@ final class Schema
             }
 
             $extraColumns .= "  `{$colName}` {$colType},\n";
+
+            // Create relational child table for repeater fields.
+            if (($field['type'] ?? '') === 'repeater') {
+                $this->create_repeater_child_table($colName, $field);
+            }
         }
 
         $sql = "CREATE TABLE {$tableName} (\n"
@@ -147,6 +152,12 @@ final class Schema
                     'format'     => $this->get_column_format($fieldType, $field),
                     'field_type' => $fieldType,
                 ];
+
+                // Attach child table reference for repeater fields.
+                if ($fieldType === 'repeater') {
+                    $map[$metaKey]['child_table'] = $this->get_table_name('enterprise_repeater_' . $metaKey);
+                    $map[$metaKey]['subfields'] = is_array($field['rows'] ?? null) ? $field['rows'] : [];
+                }
             }
         }
 
@@ -189,6 +200,49 @@ final class Schema
     public function get_column_default(string $fieldType): mixed
     {
         return self::$defaultValueMap[$fieldType] ?? '';
+    }
+
+    /**
+     * Create a secondary relational table for a repeater field's subfields.
+     *
+     * Table: wp_enterprise_repeater_{field_name}
+     * Columns: id, post_id (FK), sort_order, + one column per subfield.
+     */
+    private function create_repeater_child_table(string $fieldName, array $field): string
+    {
+        global $wpdb;
+
+        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+
+        $tableName = $this->get_table_name('enterprise_repeater_' . $fieldName);
+        $charset   = $wpdb->get_charset_collate();
+        $subfields = is_array($field['rows'] ?? null) ? $field['rows'] : [];
+
+        $columnSql = '';
+
+        foreach ($subfields as $sub) {
+            $colName = sanitize_key((string) ($sub['name'] ?? ''));
+
+            if ($colName === '') {
+                continue;
+            }
+
+            $colType    = $this->get_column_sql($sub);
+            $columnSql .= "  `{$colName}` {$colType},\n";
+        }
+
+        $sql = "CREATE TABLE {$tableName} (\n"
+            . "  `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,\n"
+            . "  `post_id` BIGINT(20) UNSIGNED NOT NULL,\n"
+            . "  `sort_order` INT UNSIGNED NOT NULL DEFAULT 0,\n"
+            . $columnSql
+            . "  PRIMARY KEY (`id`),\n"
+            . "  KEY `post_id` (`post_id`)\n"
+            . ") {$charset};";
+
+        dbDelta($sql);
+
+        return $tableName;
     }
 
     private function get_column_sql(array $field): string

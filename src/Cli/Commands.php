@@ -292,9 +292,9 @@ final class Commands
                 }
 
                 // Write directly to postmeta, bypassing the Interceptor.
-                $existingId = $wpdb->get_var(
-                    $wpdb->prepare(
-                        "SELECT `umeta_id` FROM `{$wpdb->postmeta}` WHERE `post_id` = %d AND `meta_key` = %s LIMIT 1",
+                    $existingId = $wpdb->get_var(
+                        $wpdb->prepare(
+                            "SELECT `meta_id` FROM `{$wpdb->postmeta}` WHERE `post_id` = %d AND `meta_key` = %s LIMIT 1",
                         $postId,
                         $metaKey
                     )
@@ -304,7 +304,7 @@ final class Commands
                     $result = $wpdb->update(
                         $wpdb->postmeta,
                         ['meta_value' => $value],
-                        ['umeta_id' => (int) $existingId],
+                            ['meta_id' => (int) $existingId],
                         ['%s'],
                         ['%d']
                     );

@@ -194,6 +194,7 @@ final class FieldGroups
         $definition['title'] = (string) ($definition['title'] ?? ucwords(str_replace('_', ' ', $slug)));
         $definition['post_type'] = sanitize_key((string) ($definition['post_type'] ?? ''));
         $definition['custom_table_name'] = sanitize_key((string) ($definition['custom_table_name'] ?? ''));
+        $definition['is_block'] = (bool) ($definition['is_block'] ?? false);
         $definition['location_rules'] = $this->normalizeLocationRules($definition['location_rules'] ?? []);
         $definition['fields'] = $this->normalizeFields($definition['fields'] ?? []);
 
@@ -288,11 +289,47 @@ final class FieldGroups
                 'on_text' => (string) ($field['on_text'] ?? 'On'),
                 'off_text' => (string) ($field['off_text'] ?? 'Off'),
                 'choices' => $normalizedChoices,
-                'rows' => isset($field['rows']) && is_array($field['rows']) ? $field['rows'] : [],
+                'rows' => $this->normalizeSubfields($field['rows'] ?? []),
             ];
         }
 
         return $normalizedFields;
+    }
+
+    /**
+     * Normalize the subfield (rows) schema for a repeater field.
+     *
+     * @return list<array{name: string, label: string, type: string}>
+     */
+    private function normalizeSubfields(mixed $rows): array
+    {
+        if (! is_array($rows)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($rows as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+
+            $name = sanitize_key((string) ($row['name'] ?? ''));
+
+            if ($name === '') {
+                continue;
+            }
+
+            $normalized[] = [
+                'name'       => $name,
+                'label'      => (string) ($row['label'] ?? ucwords(str_replace('_', ' ', $name))),
+                'type'       => (string) ($row['type'] ?? 'text'),
+                'image_size' => (string) ($row['image_size'] ?? 'medium'),
+                'image_link' => (string) ($row['image_link'] ?? 'none'),
+            ];
+        }
+
+        return $normalized;
     }
 
     private function flushCaches(): void
