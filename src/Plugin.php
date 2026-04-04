@@ -538,6 +538,7 @@ final class Plugin
         $groups = array_values(array_filter(
             $this->fieldGroupDefinitions(),
             static fn (array $group): bool => sanitize_key((string) ($group['post_type'] ?? '')) === $post->post_type
+                && empty($group['is_block'])
         ));
 
         if ($groups === []) {

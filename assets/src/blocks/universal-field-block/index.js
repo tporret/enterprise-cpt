@@ -49,9 +49,9 @@ const config = window.enterpriseCptEditor || { fieldGroups: [] };
 
     registerBlockType(blockName, {
         title: group.title || slug,
-        category: 'enterprise-cpt',
-        icon: 'screenoptions',
-        description: `Enterprise CPT block for the "${group.title || slug}" field group.`,
+        category: group.block_category || 'enterprise-cpt',
+        icon: group.block_icon || 'screenoptions',
+        description: group.block_description || `Enterprise CPT block for the "${group.title || slug}" field group.`,
         supports: { html: false, align: true, multiple: true },
         attributes,
         edit: Edit,

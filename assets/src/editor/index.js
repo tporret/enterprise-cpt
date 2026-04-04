@@ -9,6 +9,8 @@ import {
     SelectControl,
     Spinner,
     TextControl,
+    TextareaControl,
+    ToggleControl,
 } from '@wordpress/components';
 import { Fragment, render, useEffect, useMemo, useState } from '@wordpress/element';
 import {
@@ -133,6 +135,7 @@ function Sidebar({ group, activeFieldIndex, onGroupChange, onFieldChange }) {
     const fields = Array.isArray(group.fields) ? group.fields : [];
     const activeField = fields[activeFieldIndex] || null;
     const TypeSettings = activeField ? FIELD_SETTINGS_COMPONENTS[activeField.type] : null;
+    const isBlock = Boolean(group.is_block);
 
     return (
         <aside className="enterprise-cpt-sidebar">
@@ -159,6 +162,7 @@ function Sidebar({ group, activeFieldIndex, onGroupChange, onFieldChange }) {
                         onChange={(value) => onGroupChange({ ...group, custom_table_name: slugify(value) })}
                     />
                 </PanelBody>
+                {!isBlock && (
                 <PanelBody title="Location Rules" initialOpen>
                     <TextControl
                         label="Rule Value"
@@ -168,6 +172,43 @@ function Sidebar({ group, activeFieldIndex, onGroupChange, onFieldChange }) {
                             location_rules: [{ ...rule, value: slugify(value) }],
                         })}
                     />
+                </PanelBody>
+                )}
+                <PanelBody title="Gutenberg Block Settings" initialOpen={false}>
+                    <ToggleControl
+                        label="Register as Block"
+                        help={isBlock ? 'This field group will appear as a Gutenberg block.' : 'Enable to expose this field group as a block in the editor.'}
+                        checked={isBlock}
+                        onChange={(checked) => onGroupChange({ ...group, is_block: checked })}
+                    />
+                    {isBlock && (
+                        <>
+                            <TextControl
+                                label="Block Icon"
+                                help={'Dashicon slug (e.g. "admin-post", "format-image").'}
+                                value={group.block_icon || ''}
+                                onChange={(value) => onGroupChange({ ...group, block_icon: value })}
+                            />
+                            <SelectControl
+                                label="Block Category"
+                                value={group.block_category || 'enterprise-cpt'}
+                                options={[
+                                    { value: 'enterprise-cpt', label: 'Enterprise CPT' },
+                                    { value: 'text', label: 'Text' },
+                                    { value: 'media', label: 'Media' },
+                                    { value: 'design', label: 'Design' },
+                                    { value: 'widgets', label: 'Widgets' },
+                                    { value: 'embed', label: 'Embeds' },
+                                ]}
+                                onChange={(value) => onGroupChange({ ...group, block_category: value })}
+                            />
+                            <TextareaControl
+                                label="Description"
+                                value={group.block_description || ''}
+                                onChange={(value) => onGroupChange({ ...group, block_description: value })}
+                            />
+                        </>
+                    )}
                 </PanelBody>
 
                 {activeField ? (

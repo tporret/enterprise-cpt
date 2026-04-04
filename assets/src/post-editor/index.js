@@ -156,7 +156,7 @@ function PostEditorPlugin() {
     const { editPost } = useDispatch('core/editor');
 
     const fieldGroups = (config.fieldGroups || []).filter(
-        (g) => g.post_type === postType
+        (g) => g.post_type === postType && !g.is_block
     );
 
     if (!fieldGroups.length) return null;

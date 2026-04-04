@@ -195,6 +195,9 @@ final class FieldGroups
         $definition['post_type'] = sanitize_key((string) ($definition['post_type'] ?? ''));
         $definition['custom_table_name'] = sanitize_key((string) ($definition['custom_table_name'] ?? ''));
         $definition['is_block'] = (bool) ($definition['is_block'] ?? false);
+        $definition['block_icon'] = sanitize_text_field((string) ($definition['block_icon'] ?? ''));
+        $definition['block_category'] = sanitize_key((string) ($definition['block_category'] ?? 'enterprise-cpt'));
+        $definition['block_description'] = sanitize_text_field((string) ($definition['block_description'] ?? ''));
         $definition['location_rules'] = $this->normalizeLocationRules($definition['location_rules'] ?? []);
         $definition['fields'] = $this->normalizeFields($definition['fields'] ?? []);
 

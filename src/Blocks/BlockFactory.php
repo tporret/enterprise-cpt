@@ -40,6 +40,10 @@ final class BlockFactory
 
         $blockName = 'enterprise-cpt/' . $slug;
 
+        $icon = (string) ($group['block_icon'] ?? '');
+        $category = (string) ($group['block_category'] ?? 'enterprise-cpt');
+        $description = (string) ($group['block_description'] ?? '');
+
         // Build block attributes from field definitions.
         $attributes = [
             'blockInstanceId' => [
@@ -72,9 +76,9 @@ final class BlockFactory
         register_block_type($blockName, [
             'api_version'     => 3,
             'title'           => (string) ($group['title'] ?? ucwords(str_replace('_', ' ', $slug))),
-            'category'        => 'enterprise-cpt',
-            'icon'            => 'screenoptions',
-            'description'     => sprintf('Enterprise CPT block for the "%s" field group.', $group['title'] ?? $slug),
+            'category'        => $category !== '' ? $category : 'enterprise-cpt',
+            'icon'            => $icon !== '' ? $icon : 'screenoptions',
+            'description'     => $description !== '' ? $description : sprintf('Enterprise CPT block for the "%s" field group.', $group['title'] ?? $slug),
             'supports'        => [
                 'html'     => false,
                 'align'    => true,

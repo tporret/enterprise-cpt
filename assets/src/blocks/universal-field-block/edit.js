@@ -8,6 +8,7 @@
 
 import {
     Button,
+    CardBody,
     Modal,
     Placeholder,
     RadioControl,
@@ -18,7 +19,9 @@ import {
     ToggleControl,
 } from '@wordpress/components';
 import { useEffect, useState } from '@wordpress/element';
-import { useBlockProps } from '@wordpress/block-editor';
+import { useBlockProps, BlockControls } from '@wordpress/block-editor';
+import { ToolbarGroup, ToolbarButton } from '@wordpress/components';
+import { pencil } from '@wordpress/icons';
 import { v4 as uuidv4 } from './uuid';
 
 const config = window.enterpriseCptEditor || { fieldGroups: [] };
@@ -190,6 +193,7 @@ export default function Edit({ name, attributes, setAttributes }) {
     // Derive the field group slug from the block name: "enterprise-cpt/my-group" → "my-group"
     const slug = name.replace(/^enterprise-cpt\//, '');
     const group = getFieldGroup(slug);
+    const groupIcon = group?.block_icon || 'screenoptions';
 
     // Assign a unique block instance ID on first render if not set.
     useEffect(() => {
@@ -210,6 +214,12 @@ export default function Edit({ name, attributes, setAttributes }) {
 
     const fields = group.fields || [];
 
+    // Check if any field has data filled in.
+    const hasData = fields.some((f) => {
+        const val = attributes[f.name];
+        return val !== undefined && val !== null && val !== '' && val !== 0 && val !== false;
+    });
+
     // Build a summary of the current data.
     const summaryItems = fields
         .slice(0, 4)
@@ -227,48 +237,75 @@ export default function Edit({ name, attributes, setAttributes }) {
 
     return (
         <div {...blockProps}>
-            {/* Summary View on Canvas */}
-            <div
-                style={{
-                    border: '1px solid #ddd',
-                    borderRadius: 4,
-                    padding: 16,
-                    background: '#fafafa',
-                }}
-            >
-                <div
-                    style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        marginBottom: summaryItems.length ? 12 : 0,
-                    }}
+            {/* Toolbar: pencil icon to open Focus Modal */}
+            <BlockControls>
+                <ToolbarGroup>
+                    <ToolbarButton
+                        icon={pencil}
+                        label="Edit Data"
+                        onClick={() => setIsModalOpen(true)}
+                    />
+                </ToolbarGroup>
+            </BlockControls>
+
+            {/* Placeholder when no data exists yet */}
+            {!hasData && !isModalOpen && (
+                <Placeholder
+                    icon={groupIcon}
+                    label={group.title || slug}
+                    instructions={group.block_description || 'Click "Edit Data" to configure this block.'}
                 >
-                    <strong style={{ fontSize: 14 }}>
-                        {group.title || slug}
-                    </strong>
-                    <Button variant="primary" isSmall onClick={() => setIsModalOpen(true)}>
+                    <Button variant="primary" onClick={() => setIsModalOpen(true)}>
                         Edit Data
                     </Button>
-                </div>
+                </Placeholder>
+            )}
 
-                {summaryItems.length > 0 ? (
-                    <ul style={{ margin: 0, paddingLeft: 16, fontSize: 13, color: '#50575e' }}>
-                        {summaryItems.map((item, i) => (
-                            <li key={i}>{item}</li>
-                        ))}
-                        {fields.length > 4 && (
-                            <li style={{ fontStyle: 'italic' }}>
-                                +{fields.length - 4} more field(s)
-                            </li>
+            {/* Summary Card when data exists */}
+            {hasData && (
+                <div
+                    style={{
+                        border: '1px solid var(--wp-admin-theme-color, #007cba)',
+                        borderRadius: 2,
+                        background: 'var(--wp-admin-theme-color-darker-10, #fafafa)',
+                        overflow: 'hidden',
+                    }}
+                >
+                    <CardBody>
+                        <div
+                            style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                marginBottom: summaryItems.length ? 12 : 0,
+                            }}
+                        >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span className={`dashicons dashicons-${groupIcon}`} style={{ fontSize: 20, width: 20, height: 20, color: 'var(--wp-admin-theme-color, #007cba)' }} />
+                                <strong style={{ fontSize: 14 }}>
+                                    {group.title || slug}
+                                </strong>
+                            </div>
+                            <Button variant="primary" isSmall onClick={() => setIsModalOpen(true)}>
+                                Edit Data
+                            </Button>
+                        </div>
+
+                        {summaryItems.length > 0 && (
+                            <ul style={{ margin: 0, paddingLeft: 16, fontSize: 13, color: '#50575e' }}>
+                                {summaryItems.map((item, i) => (
+                                    <li key={i}>{item}</li>
+                                ))}
+                                {fields.length > 4 && (
+                                    <li style={{ fontStyle: 'italic' }}>
+                                        +{fields.length - 4} more field(s)
+                                    </li>
+                                )}
+                            </ul>
                         )}
-                    </ul>
-                ) : (
-                    <p style={{ margin: 0, fontSize: 13, color: '#757575', fontStyle: 'italic' }}>
-                        Click "Edit Data" to configure this block.
-                    </p>
-                )}
-            </div>
+                    </CardBody>
+                </div>
+            )}
 
             {/* Focus Canvas Modal */}
             {isModalOpen && (
