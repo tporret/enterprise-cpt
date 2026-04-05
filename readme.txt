@@ -54,10 +54,33 @@ You can:
 - Any field group can become a native Gutenberg block by adding `"is_block": true` to its JSON
 - Blocks appear in the **Enterprise CPT** block category in the inserter
 - Universal Edit component shows a canvas summary view and opens a Focus Canvas modal for editing
-- Server-side rendering via `render_callback` with theme template support: `{theme}/enterprise-cpts/blocks/{slug}.php`
-- Template receives a `$fields` stdClass object (e.g. `echo $fields->heading;`)
+- Live preview in the editor is server-rendered and uses the same template resolution path as frontend output
+- Enterprise Template Resolver checks templates in this order:
+	1. Active Theme: `{theme}/enterprise-cpt/blocks/{slug}.php`
+	2. Persistent Storage: `wp-content/uploads/enterprise-cpt/templates/{slug}.php`
+	3. Plugin fallback: `templates/generic-block.php`
+- If no custom template exists, the plugin fallback renders clean semantic HTML automatically
+- When a field group is saved with `"is_block": true`, a starter template is auto-generated in uploads when needed
+- Upload template folder is hardened with `index.php` and `.htaccess`
 - Block data is saved to the field group's custom table via `rest_pre_insert_post`, keyed by `block_instance_id`
 - Multiple blocks of the same type on one page each get an isolated row in the custom table
+
+= Block Templates: How To Use =
+
+1. Create or edit a Field Group and enable block mode (`"is_block": true`).
+2. Insert the block in Gutenberg from the **Enterprise CPT** category.
+3. Customize output by creating a theme template at:
+	 - `wp-content/themes/your-theme/enterprise-cpt/blocks/{slug}.php`
+4. If no theme template exists, Enterprise CPT uses uploads scaffold (if available), then plugin fallback.
+
+Template variables:
+
+- `$fields` (associative array of values)
+- `$group` (field group definition)
+
+Example:
+
+`<h2><?php echo esc_html( $fields['heading'] ?? '' ); ?></h2>`
 
 = Performance Storage =
 
@@ -131,6 +154,15 @@ No. Shadow sync and compatibility paths are included to support standard WordPre
 - Block storage resolver: syncs block attributes to custom table via `rest_pre_insert_post`
 - Block instance isolation via UUID `block_instance_id` per placed block
 - New `build:blocks` npm script for the blocks bundle
+
+= 0.3.0 =
+
+- Enterprise Template Resolver introduced for block rendering consistency across editor preview and frontend
+- Template lookup order: active theme (`enterprise-cpt/blocks`), uploads scaffold storage, plugin generic fallback
+- New generic fallback template (`templates/generic-block.php`) for safe default rendering
+- New template scaffolder auto-generates starter templates to uploads on field group save when `is_block: true`
+- Uploads template directory hardening via `index.php` and `.htaccess`
+- Field Group save REST response now includes non-blocking scaffold warnings when file writes are unavailable
 
 = 0.1.0 =
 

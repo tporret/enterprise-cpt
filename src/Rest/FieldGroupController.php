@@ -165,13 +165,20 @@ final class FieldGroupController
 
         $this->fieldGroups->save_definition($slug, $definition);
 
-        return new WP_REST_Response(
-            [
-                'item' => $this->fieldGroups->definitions()[$slug] ?? null,
-                'isWritable' => ! $this->fieldGroups->is_readonly_env(),
-            ],
-            200
-        );
+        $response = [
+            'item'       => $this->fieldGroups->definitions()[$slug] ?? null,
+            'isWritable' => ! $this->fieldGroups->is_readonly_env(),
+        ];
+
+        // Surface any scaffold warnings from the save action.
+        $scaffoldWarning = get_transient('enterprise_cpt_scaffold_warning_' . $slug);
+
+        if (is_string($scaffoldWarning) && $scaffoldWarning !== '') {
+            $response['scaffold_warning'] = $scaffoldWarning;
+            delete_transient('enterprise_cpt_scaffold_warning_' . $slug);
+        }
+
+        return new WP_REST_Response($response, 200);
     }
 
     public function can_manage(): bool

@@ -23,6 +23,7 @@ use EnterpriseCPT\Storage\Interceptor;
 use EnterpriseCPT\Storage\Schema;
 use EnterpriseCPT\Storage\ShadowSync;
 use EnterpriseCPT\Storage\TableManager;
+use EnterpriseCPT\Templates\Scaffolder;
 
 final class Plugin
 {
@@ -66,6 +67,8 @@ final class Plugin
 
     private BlockFactory $blockFactory;
 
+    private Scaffolder $templateScaffolder;
+
     public static function boot(string $pluginFile): self
     {
         if (self::$instance === null) {
@@ -83,7 +86,7 @@ final class Plugin
         $this->fieldRegistrar = new FieldRegistrar();
         $this->fieldGroupController = new FieldGroupController($this->fieldGroupEngine);
         $this->cptController = new CPTController($this->cptEngine, ENTERPRISE_CPT_PATH . 'definitions/cpt');
-        $this->blockRendererController = new BlockRendererController();
+        $this->blockRendererController = new BlockRendererController($this->fieldGroupEngine);
         $this->locationCompiler = new Compiler(
             $this->fieldGroupEngine,
             new RuleFactory(),
@@ -107,6 +110,7 @@ final class Plugin
         $this->insights = new Insights($this);
         $this->fieldApi = new Field($this);
         $this->blockFactory = new BlockFactory($this->fieldGroupEngine);
+        $this->templateScaffolder = new Scaffolder();
 
         $this->registerHooks();
     }
@@ -128,6 +132,7 @@ final class Plugin
         add_action('admin_enqueue_scripts', [$this, 'enqueueAdminAssets']);
         add_action('cli_init', [$this, 'registerCliCommands']);
         add_action('enterprise_cpt/field_group_saved', [$this, 'compileLocationRegistry'], 10, 2);
+        add_action('enterprise_cpt/field_group_saved', [$this, 'scaffoldBlockTemplate'], 15, 2);
         add_action('wp_after_insert_post', [$this, 'handleFieldGroupPostInsert'], 10, 4);
         add_action('init', [$this, 'ensureCustomTablesIfChanged'], 10);
 
@@ -512,6 +517,27 @@ final class Plugin
     public function compileLocationRegistry(string $slug = '', array $definition = []): void
     {
         $this->locationCompiler->compile();
+    }
+
+    /**
+     * Auto-scaffold a block template when a field group with is_block is saved.
+     */
+    public function scaffoldBlockTemplate(string $slug, array $definition): void
+    {
+        if (empty($definition['is_block'])) {
+            return;
+        }
+
+        $result = $this->templateScaffolder->scaffold($slug, $definition);
+
+        if ($result['warning'] !== '') {
+            // Store as a transient so the admin UI can surface it.
+            set_transient(
+                'enterprise_cpt_scaffold_warning_' . $slug,
+                $result['warning'],
+                300
+            );
+        }
     }
 
     public function handleFieldGroupPostInsert(int $postId, \WP_Post $post, bool $update, ?\WP_Post $postBefore): void

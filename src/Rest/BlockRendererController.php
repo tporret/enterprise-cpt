@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace EnterpriseCPT\Rest;
 
+use EnterpriseCPT\Engine\FieldGroups;
+use EnterpriseCPT\Templates\Resolver;
 use WP_REST_Request;
 use WP_REST_Response;
 use WP_Error;
@@ -11,6 +13,13 @@ use WP_Error;
 final class BlockRendererController
 {
     private const NAMESPACE = 'enterprise-cpt/v1';
+
+    private FieldGroups $fieldGroups;
+
+    public function __construct(FieldGroups $fieldGroups)
+    {
+        $this->fieldGroups = $fieldGroups;
+    }
 
     public function register_routes(): void
     {
@@ -44,52 +53,35 @@ final class BlockRendererController
 
     public function render_block(WP_REST_Request $request): WP_REST_Response|WP_Error
     {
-        $blockName  = $request->get_param('block_name');
+        $blockName  = sanitize_key($request->get_param('block_name'));
         $attributes = json_decode($request->get_param('attributes'), true);
 
         if (! is_array($attributes)) {
             $attributes = [];
         }
 
-        $templatePath = $this->resolve_template_path($blockName);
+        // Find the field group definition so Resolver has full context.
+        $group = null;
 
-        if ($templatePath === null) {
-            $expectedPath = get_stylesheet_directory() . "/enterprise-cpts/blocks/{$blockName}.php";
+        foreach ($this->fieldGroups->definitionList() as $def) {
+            if (sanitize_key((string) ($def['name'] ?? '')) === $blockName) {
+                $group = $def;
+                break;
+            }
+        }
 
+        if ($group === null) {
             return new WP_REST_Response(
                 [
                     'html'  => '',
-                    'error' => 'Template not found. Create the template at: ' . $expectedPath,
+                    'error' => sprintf('Field group "%s" not found.', $blockName),
                 ],
                 404
             );
         }
 
-        $fields = $attributes;
-
-        ob_start();
-        include $templatePath;
-        $html = ob_get_clean();
+        $html = Resolver::render_block($group, $attributes);
 
         return new WP_REST_Response(['html' => $html], 200);
-    }
-
-    private function resolve_template_path(string $blockName): ?string
-    {
-        // Theme override first (child theme then parent theme)
-        $themeTemplate = get_stylesheet_directory() . "/enterprise-cpts/blocks/{$blockName}.php";
-
-        if (is_readable($themeTemplate)) {
-            return $themeTemplate;
-        }
-
-        // Parent theme fallback
-        $parentTemplate = get_template_directory() . "/enterprise-cpts/blocks/{$blockName}.php";
-
-        if ($parentTemplate !== $themeTemplate && is_readable($parentTemplate)) {
-            return $parentTemplate;
-        }
-
-        return null;
     }
 }

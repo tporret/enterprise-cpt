@@ -175,19 +175,41 @@ Field groups can be exposed as native Gutenberg blocks by adding `"is_block": tr
 
 2. **React Edit Component** — The universal block Edit component detects which field group it represents, shows a summary view on the canvas, and opens a centered modal (Focus Canvas) with all custom fields when "Edit Data" is clicked.
 
-3. **Theme Templates** — The `render_callback` looks for `{theme}/enterprise-cpts/blocks/{slug}.php`. If found, it runs that template with a `$fields` stdClass object so developers can do:
+3. **Enterprise Template Resolver** — Rendering now uses a shared resolver for both frontend and editor SSR preview. This solves two recurring issues:
+  - Preview/frontend drift (different template lookup logic)
+  - Missing-template failures in early development
 
-   ```php
-   // theme/enterprise-cpts/blocks/my-group.php
-   echo '<h2>' . esc_html( $fields->title ) . '</h2>';
-   echo '<p>' . esc_html( $fields->description ) . '</p>';
-   ```
+  Resolution order:
+  1. Active theme override: `{theme}/enterprise-cpt/blocks/{slug}.php`
+  2. Persistent scaffold storage: `wp-content/uploads/enterprise-cpt/templates/{slug}.php`
+  3. Plugin fallback: `templates/generic-block.php`
 
-   Falls back to default HTML rendering if no template exists.
+  Because the fallback always exists, rendering is resilient by default.
 
-4. **Storage Resolver** — The `rest_pre_insert_post` filter intercepts post saves, parses any `enterprise-cpt/*` blocks from the post content, and upserts their attributes into the field group's custom table keyed by `block_instance_id`. This means block data never stays only in block attributes — it is persisted to the same custom table as standard field groups.
+4. **Template Scaffolder** — When a field group is saved with `is_block: true`, the plugin attempts to scaffold a starter template into uploads **only if**:
+  - no theme template exists
+  - no uploads template already exists
 
-5. **Block Instance ID** — Each block instance gets a UUID (`blockInstanceId` attribute) on first render, so multiple blocks of the same type on one page each have an isolated row in the custom table.
+  This keeps developer overrides authoritative while still giving non-theme users a writable customization path.
+
+5. **Security Hardening for Upload Templates** — The scaffold directory is protected with:
+  - `index.php` (directory listing protection)
+  - `.htaccess` deny rules for direct PHP execution
+
+6. **Non-Blocking Failure Signaling** — If scaffold writes fail (permissions/read-only FS), save succeeds and the REST response includes `scaffold_warning`, allowing the admin UI to show: `Template generation skipped - using fallback`.
+
+7. **Storage Resolver** — The `rest_pre_insert_post` filter intercepts post saves, parses any `enterprise-cpt/*` blocks from the post content, and upserts their attributes into the field group's custom table keyed by `block_instance_id`. This means block data never stays only in block attributes — it is persisted to the same custom table as standard field groups.
+
+8. **Block Instance ID** — Each block instance gets a UUID (`blockInstanceId` attribute) on first render, so multiple blocks of the same type on one page each have an isolated row in the custom table.
+
+### Why This Feature Exists
+
+The resolver/scaffolder design was introduced to make block rendering production-safe and editor-friendly in real environments:
+
+- **Consistent output pipeline**: one resolver for frontend and SSR preview
+- **Zero-config first render**: plugin fallback prevents broken previews
+- **Progressive customization**: users can start with scaffolded templates, then promote to theme templates
+- **Read-only resilience**: if writes fail, blocks still render and users get explicit warnings
 
 ### Enabling a Block
 
@@ -207,6 +229,29 @@ Add `"is_block": true` to any field group JSON in `blocks/fields/`:
 ```
 
 The block will appear in the **Enterprise CPT** block category in the block inserter.
+
+### Template Authoring Contract
+
+Templates receive:
+
+- `$fields` as an associative array of values
+- `$group` as the field group definition array
+
+Example theme template:
+
+```php
+<?php
+if ( ! defined( 'ABSPATH' ) ) {
+  exit;
+}
+
+$fields = (array) $fields;
+?>
+<section class="hero-banner">
+  <h2><?php echo esc_html( $fields['heading'] ?? '' ); ?></h2>
+  <p><?php echo esc_html( $fields['description'] ?? '' ); ?></p>
+</section>
+```
 
 ## Development Notes
 
