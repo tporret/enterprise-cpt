@@ -54,16 +54,22 @@ export default function RepeaterFieldSettings({ field, onChange }) {
                     }}
                 >
                     <TextControl
+            __next40pxDefaultSize
+            __nextHasNoMarginBottom
                         label="Name"
                         value={row.name || ''}
                         onChange={(v) => updateSubfield(idx, 'name', slugify(v))}
                     />
                     <TextControl
+            __next40pxDefaultSize
+            __nextHasNoMarginBottom
                         label="Label"
                         value={row.label || ''}
                         onChange={(v) => updateSubfield(idx, 'label', v)}
                     />
                     <SelectControl
+                __next40pxDefaultSize
+                __nextHasNoMarginBottom
                         label="Type"
                         value={row.type || 'text'}
                         options={SUB_FIELD_TYPES}
@@ -72,6 +78,8 @@ export default function RepeaterFieldSettings({ field, onChange }) {
                     {row.type === 'image' && (
                         <>
                             <SelectControl
+                __next40pxDefaultSize
+                __nextHasNoMarginBottom
                                 label="Image Size"
                                 value={row.image_size || 'medium'}
                                 options={[
@@ -83,6 +91,8 @@ export default function RepeaterFieldSettings({ field, onChange }) {
                                 onChange={(v) => updateSubfield(idx, 'image_size', v)}
                             />
                             <SelectControl
+                __next40pxDefaultSize
+                __nextHasNoMarginBottom
                                 label="Link To"
                                 value={row.image_link || 'none'}
                                 options={[

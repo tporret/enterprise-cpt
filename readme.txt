@@ -49,6 +49,19 @@ You can:
 - Bulk image row creation from the media library
 - Inline image preview, replace, and remove controls
 
+= Drag-and-Drop Reordering =
+
+- Reorder Field Groups in the list view by dragging the handle
+- Reorder Fields within a field group editor by dragging the handle
+- All changes auto-save automatically
+
+= Multi-Select Location Rules =
+
+- Field groups can appear on multiple post types, taxonomies, or user roles simultaneously
+- Checkbox-based multi-select UI for selecting multiple location targets
+- OR logic: field group shows when context matches ANY selected value
+- Supports backward compatibility with single-value rules
+
 = Field-to-Block Bridge =
 
 - Any field group can become a native Gutenberg block by adding `"is_block": true` to its JSON
@@ -93,6 +106,23 @@ Template variables:
 Example:
 
 `<h2><?php echo esc_html( $fields['heading'] ?? '' ); ?></h2>`
+
+= Multi-Select Location Rules =
+
+Field groups can now appear on multiple post types, taxonomies, or user roles using multi-select checkboxes:
+
+- Edit a field group and go to **Location Rules**
+- Choose a rule type (Post Type, Taxonomy, or User Role)
+- Check the boxes for all locations where this field group should appear
+- The field group will appear on **any** of the selected locations (OR logic)
+
+Example: A "Product Details" field group can appear on Post, Product, and Service post types simultaneously.
+
+= Drag-and-Drop Reordering =
+
+- Reorder field groups in the list view by dragging the handle icons
+- Reorder fields within a field group editor by dragging the handle icons
+- Changes auto-save automatically
 
 = Performance Storage =
 
@@ -155,6 +185,16 @@ Definition saves are buffered into WordPress options when files are not writable
 No. Shadow sync and compatibility paths are included to support standard WordPress metadata access patterns.
 
 == Changelog ==
+
+= 0.5.0 =
+
+- Multi-select location rules: field groups can now appear on multiple post types, taxonomies, or user roles simultaneously
+- Checkbox-based UI for selecting multiple location targets with OR logic
+- New REST endpoint `/location-options` returns available post types, taxonomies, and user roles
+- Updated rule evaluation classes (PostTypeRule, TaxonomyRule, UserRoleRule) to support array values
+- Drag-and-drop field reordering within field group editor with auto-save
+- Field reordering UI with visual feedback (drag handles, selected state, dragging opacity)
+- Auto-save field order to REST API when fields are reordered
 
 = 0.4.0 =
 

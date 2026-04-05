@@ -79,6 +79,14 @@ final class CPT
         if (! $this->is_readonly_env()) {
             $targetFile = $this->storagePath . DIRECTORY_SEPARATOR . $normalizedSlug . '.json';
             file_put_contents($targetFile, (string) wp_json_encode($definition, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+
+            // Remove stale DB-buffer value when filesystem save succeeds.
+            $buffer = get_option($this->bufferOptionName, []);
+            if (is_array($buffer) && array_key_exists($normalizedSlug, $buffer)) {
+                unset($buffer[$normalizedSlug]);
+                update_option($this->bufferOptionName, $buffer, false);
+            }
+
             $this->flushCaches();
 
             return;

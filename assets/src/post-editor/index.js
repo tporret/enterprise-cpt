@@ -50,6 +50,7 @@ function FieldRenderer({ field, value, onChange }) {
     if (type === 'textarea') {
         return (
             <TextareaControl
+                __nextHasNoMarginBottom
                 label={field.label}
                 help={field.help}
                 value={toStr(value)}
@@ -61,6 +62,8 @@ function FieldRenderer({ field, value, onChange }) {
     if (type === 'email') {
         return (
             <TextControl
+            __next40pxDefaultSize
+            __nextHasNoMarginBottom
                 label={field.label}
                 help={field.help}
                 type="email"
@@ -73,6 +76,8 @@ function FieldRenderer({ field, value, onChange }) {
     if (type === 'number') {
         return (
             <TextControl
+            __next40pxDefaultSize
+            __nextHasNoMarginBottom
                 label={field.label}
                 help={field.help}
                 type="number"
@@ -99,6 +104,8 @@ function FieldRenderer({ field, value, onChange }) {
         ];
         return (
             <SelectControl
+                __next40pxDefaultSize
+                __nextHasNoMarginBottom
                 label={field.label}
                 help={field.help}
                 value={toStr(value)}
@@ -123,6 +130,7 @@ function FieldRenderer({ field, value, onChange }) {
     if (type === 'true_false') {
         return (
             <ToggleControl
+                        __nextHasNoMarginBottom
                 label={field.label}
                 help={field.help || `${field.on_text || 'On'} / ${field.off_text || 'Off'}`}
                 checked={Boolean(value)}
@@ -134,6 +142,8 @@ function FieldRenderer({ field, value, onChange }) {
     // Default: text
     return (
         <TextControl
+            __next40pxDefaultSize
+            __nextHasNoMarginBottom
             label={field.label}
             help={field.help}
             value={toStr(value)}

@@ -33,6 +33,11 @@ const defaultFieldGroup = () => ({
     post_type: 'post',
     location_rules: [{ param: 'post_type', operator: '==', value: 'post' }],
     custom_table_name: '',
+    permissions: {
+        minimum_role: 'any',
+        custom_capability: '',
+        read_only: false,
+    },
     fields: [createFieldByType('text', 1)],
 });
 
@@ -44,7 +49,7 @@ const slugify = (value) =>
         .replace(/[\s]+/g, '_')
         .replace(/_+/g, '_');
 
-function FieldGroupList({ items, loading, onAddNew, onEdit, onDelete }) {
+function FieldGroupList({ items, loading, onAddNew, onEdit, onDelete, onMoveUp, onMoveDown }) {
     return (
         <Card>
             <CardBody>
@@ -62,22 +67,49 @@ function FieldGroupList({ items, loading, onAddNew, onEdit, onDelete }) {
                     <table className="widefat striped">
                         <thead>
                             <tr>
+                                <th style={{ width: 60 }}></th>
                                 <th>Title</th>
                                 <th>Name (Slug)</th>
                                 <th>Locations</th>
                                 <th>Storage</th>
-                                <th style={{ width: 160 }}>Actions</th>
+                                <th style={{ width: 200 }}>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             {!items.length ? (
-                                <tr><td colSpan={5}>No field groups found.</td></tr>
+                                <tr><td colSpan={6}>No field groups found.</td></tr>
                             ) : null}
-                            {items.map((item) => {
+                            {items.map((item, index) => {
                                 const isCustomTable = item.custom_table_status === 'custom_table';
+                                const canMoveUp = index > 0;
+                                const canMoveDown = index < items.length - 1;
 
                                 return (
                                     <tr key={item.slug}>
+                                        <td style={{ textAlign: 'center', padding: '8px 4px' }}>
+                                            <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                                                <Button
+                                                    isSmall
+                                                    variant="tertiary"
+                                                    onClick={() => onMoveUp(index)}
+                                                    disabled={!canMoveUp}
+                                                    title="Move up"
+                                                    style={{ minHeight: 'unset', padding: '2px 6px', fontSize: 12 }}
+                                                >
+                                                    ↑
+                                                </Button>
+                                                <Button
+                                                    isSmall
+                                                    variant="tertiary"
+                                                    onClick={() => onMoveDown(index)}
+                                                    disabled={!canMoveDown}
+                                                    title="Move down"
+                                                    style={{ minHeight: 'unset', padding: '2px 6px', fontSize: 12 }}
+                                                >
+                                                    ↓
+                                                </Button>
+                                            </div>
+                                        </td>
                                         <td>{item.title}</td>
                                         <td><code>{item.slug}</code></td>
                                         <td>{item.locations}</td>
@@ -114,6 +146,7 @@ function FieldGroupList({ items, loading, onAddNew, onEdit, onDelete }) {
     );
 }
 
+
 function HeaderBar({ title, isSaving, onBack, onSave, onExport }) {
     return (
         <div className="enterprise-cpt-header" style={{ marginBottom: 12 }}>
@@ -130,33 +163,139 @@ function HeaderBar({ title, isSaving, onBack, onSave, onExport }) {
     );
 }
 
-function Sidebar({ group, activeFieldIndex, onGroupChange, onFieldChange }) {
+function LocationRulesPanel({ group, onGroupChange, locationOptions, loading }) {
     const rule = group.location_rules?.[0] || { param: 'post_type', operator: '==', value: '' };
+    const [selectedValues, setSelectedValues] = useState(
+        Array.isArray(rule.value) ? rule.value : (rule.value ? [rule.value] : [])
+    );
+
+    useEffect(() => {
+        setSelectedValues(Array.isArray(rule.value) ? rule.value : (rule.value ? [rule.value] : []));
+    }, [rule.value]);
+
+    const getRuleOptions = () => {
+        if (rule.param === 'post_type') {
+            return locationOptions.post_types || [];
+        } else if (rule.param === 'taxonomy') {
+            return locationOptions.taxonomies || [];
+        } else if (rule.param === 'user_role') {
+            return locationOptions.user_roles || [];
+        }
+        return [];
+    };
+
+    const handleRuleParamChange = (newParam) => {
+        onGroupChange({
+            ...group,
+            location_rules: [{ ...rule, param: newParam, value: [] }],
+        });
+        setSelectedValues([]);
+    };
+
+    const handleValueChange = (newValue) => {
+        setSelectedValues(newValue);
+        onGroupChange({
+            ...group,
+            location_rules: [{ ...rule, value: newValue.length > 0 ? newValue : '' }],
+        });
+    };
+
+    const ruleOptions = getRuleOptions();
+
+    if (loading) {
+        return <Spinner />;
+    }
+
+    return (
+        <>
+            <SelectControl
+                __next40pxDefaultSize
+                __nextHasNoMarginBottom
+                label="Rule Type"
+                value={rule.param || 'post_type'}
+                options={[
+                    { value: 'post_type', label: 'Post Type' },
+                    { value: 'taxonomy', label: 'Taxonomy' },
+                    { value: 'user_role', label: 'User Role' },
+                ]}
+                onChange={handleRuleParamChange}
+            />
+            <div className="location-rules-multi-select" style={{ marginTop: 12 }}>
+                <label style={{ display: 'block', marginBottom: 8, fontWeight: 500 }}>Selected Values</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {ruleOptions.map((option) => (
+                        <label
+                            key={option.value}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 6,
+                                padding: '6px 12px',
+                                border: '1px solid #ddd',
+                                borderRadius: 4,
+                                cursor: 'pointer',
+                                background: selectedValues.includes(option.value) ? '#f0f6fc' : '#fff',
+                            }}
+                        >
+                            <input
+                                type="checkbox"
+                                checked={selectedValues.includes(option.value)}
+                                onChange={(e) => {
+                                    if (e.target.checked) {
+                                        handleValueChange([...selectedValues, option.value]);
+                                    } else {
+                                        handleValueChange(selectedValues.filter(v => v !== option.value));
+                                    }
+                                }}
+                            />
+                            {option.label}
+                        </label>
+                    ))}
+                </div>
+            </div>
+        </>
+    );
+}
+
+function Sidebar({ group, activeFieldIndex, onGroupChange, onFieldChange, locationOptions, isLoadingLocationOptions }) {
     const fields = Array.isArray(group.fields) ? group.fields : [];
     const activeField = fields[activeFieldIndex] || null;
     const TypeSettings = activeField ? FIELD_SETTINGS_COMPONENTS[activeField.type] : null;
     const isBlock = Boolean(group.is_block);
+    const permissions = group.permissions || {
+        minimum_role: 'any',
+        custom_capability: '',
+        read_only: false,
+    };
 
     return (
         <aside className="enterprise-cpt-sidebar">
             <Panel header="Field Group Settings">
                 <PanelBody title="General" initialOpen>
                     <TextControl
+            __next40pxDefaultSize
+            __nextHasNoMarginBottom
                         label="Name (Slug)"
                         value={group.name || ''}
                         onChange={(value) => onGroupChange({ ...group, name: slugify(value) })}
                     />
                     <TextControl
+            __next40pxDefaultSize
+            __nextHasNoMarginBottom
                         label="Title"
                         value={group.title || ''}
                         onChange={(value) => onGroupChange({ ...group, title: value })}
                     />
                     <TextControl
+            __next40pxDefaultSize
+            __nextHasNoMarginBottom
                         label="Post Type"
                         value={group.post_type || ''}
                         onChange={(value) => onGroupChange({ ...group, post_type: slugify(value) })}
                     />
                     <TextControl
+            __next40pxDefaultSize
+            __nextHasNoMarginBottom
                         label="Custom Table Name"
                         value={group.custom_table_name || ''}
                         onChange={(value) => onGroupChange({ ...group, custom_table_name: slugify(value) })}
@@ -164,18 +303,17 @@ function Sidebar({ group, activeFieldIndex, onGroupChange, onFieldChange }) {
                 </PanelBody>
                 {!isBlock && (
                 <PanelBody title="Location Rules" initialOpen>
-                    <TextControl
-                        label="Rule Value"
-                        value={rule.value || ''}
-                        onChange={(value) => onGroupChange({
-                            ...group,
-                            location_rules: [{ ...rule, value: slugify(value) }],
-                        })}
+                    <LocationRulesPanel
+                        group={group}
+                        onGroupChange={onGroupChange}
+                        locationOptions={locationOptions}
+                        loading={isLoadingLocationOptions}
                     />
                 </PanelBody>
                 )}
                 <PanelBody title="Gutenberg Block Settings" initialOpen={false}>
                     <ToggleControl
+                        __nextHasNoMarginBottom
                         label="Register as Block"
                         help={isBlock ? 'This field group will appear as a Gutenberg block.' : 'Enable to expose this field group as a block in the editor.'}
                         checked={isBlock}
@@ -184,12 +322,16 @@ function Sidebar({ group, activeFieldIndex, onGroupChange, onFieldChange }) {
                     {isBlock && (
                         <>
                             <TextControl
+            __next40pxDefaultSize
+            __nextHasNoMarginBottom
                                 label="Block Icon"
                                 help={'Dashicon slug (e.g. "admin-post", "format-image").'}
                                 value={group.block_icon || ''}
                                 onChange={(value) => onGroupChange({ ...group, block_icon: value })}
                             />
                             <SelectControl
+                __next40pxDefaultSize
+                __nextHasNoMarginBottom
                                 label="Block Category"
                                 value={group.block_category || 'enterprise-cpt'}
                                 options={[
@@ -203,6 +345,7 @@ function Sidebar({ group, activeFieldIndex, onGroupChange, onFieldChange }) {
                                 onChange={(value) => onGroupChange({ ...group, block_category: value })}
                             />
                             <TextareaControl
+                __nextHasNoMarginBottom
                                 label="Description"
                                 value={group.block_description || ''}
                                 onChange={(value) => onGroupChange({ ...group, block_description: value })}
@@ -211,19 +354,75 @@ function Sidebar({ group, activeFieldIndex, onGroupChange, onFieldChange }) {
                     )}
                 </PanelBody>
 
+                <PanelBody title="Security" initialOpen={false}>
+                    <SelectControl
+                __next40pxDefaultSize
+                __nextHasNoMarginBottom
+                        label="Minimum Role Required"
+                        value={permissions.minimum_role || 'any'}
+                        options={[
+                            { value: 'any', label: 'Any' },
+                            { value: 'contributor', label: 'Contributor' },
+                            { value: 'author', label: 'Author' },
+                            { value: 'editor', label: 'Editor' },
+                            { value: 'administrator', label: 'Administrator' },
+                        ]}
+                        onChange={(value) => onGroupChange({
+                            ...group,
+                            permissions: {
+                                ...permissions,
+                                minimum_role: value,
+                            },
+                        })}
+                    />
+                    <TextControl
+            __next40pxDefaultSize
+            __nextHasNoMarginBottom
+                        label="Custom Capability"
+                        help='Optional capability override (e.g. "manage_financials"). If set, this takes precedence over minimum role.'
+                        value={permissions.custom_capability || ''}
+                        onChange={(value) => onGroupChange({
+                            ...group,
+                            permissions: {
+                                ...permissions,
+                                custom_capability: slugify(value),
+                            },
+                        })}
+                    />
+                    <ToggleControl
+                        __nextHasNoMarginBottom
+                        label="Read-Only Mode"
+                        help="When enabled, users without edit permission can view field values but cannot edit them."
+                        checked={Boolean(permissions.read_only)}
+                        onChange={(checked) => onGroupChange({
+                            ...group,
+                            permissions: {
+                                ...permissions,
+                                read_only: Boolean(checked),
+                            },
+                        })}
+                    />
+                </PanelBody>
+
                 {activeField ? (
                     <PanelBody title={`Field Settings: ${activeField.label || activeField.name || 'Field'}`} initialOpen>
                         <TextControl
+            __next40pxDefaultSize
+            __nextHasNoMarginBottom
                             label="Label"
                             value={activeField.label || ''}
                             onChange={(value) => onFieldChange(activeFieldIndex, { ...activeField, label: value })}
                         />
                         <TextControl
+            __next40pxDefaultSize
+            __nextHasNoMarginBottom
                             label="Name"
                             value={activeField.name || ''}
                             onChange={(value) => onFieldChange(activeFieldIndex, { ...activeField, name: slugify(value) })}
                         />
                         <TextControl
+            __next40pxDefaultSize
+            __nextHasNoMarginBottom
                             label="Help Text"
                             value={activeField.help || ''}
                             onChange={(value) => onFieldChange(activeFieldIndex, { ...activeField, help: value })}
@@ -271,6 +470,30 @@ function MainCanvas({ group, activeFieldIndex, setActiveFieldIndex, onGroupChang
         }
     };
 
+    const moveFieldUp = (index, event) => {
+        event.stopPropagation();
+        if (index <= 0) {
+            return;
+        }
+
+        const nextFields = [...fields];
+        [nextFields[index - 1], nextFields[index]] = [nextFields[index], nextFields[index - 1]];
+        onGroupChange({ ...group, fields: nextFields });
+        setActiveFieldIndex(index - 1);
+    };
+
+    const moveFieldDown = (index, event) => {
+        event.stopPropagation();
+        if (index >= fields.length - 1) {
+            return;
+        }
+
+        const nextFields = [...fields];
+        [nextFields[index], nextFields[index + 1]] = [nextFields[index + 1], nextFields[index]];
+        onGroupChange({ ...group, fields: nextFields });
+        setActiveFieldIndex(index + 1);
+    };
+
     return (
         <main className="enterprise-cpt-canvas">
             <div className="enterprise-cpt-canvas__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -280,6 +503,8 @@ function MainCanvas({ group, activeFieldIndex, setActiveFieldIndex, onGroupChang
                 </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'end' }}>
                     <SelectControl
+                __next40pxDefaultSize
+                __nextHasNoMarginBottom
                         label="Field Type"
                         value={newFieldType}
                         options={FIELD_TYPE_OPTIONS}
@@ -301,6 +526,26 @@ function MainCanvas({ group, activeFieldIndex, setActiveFieldIndex, onGroupChang
                                 <strong>{field.label || `Field ${index + 1}`}</strong>
                                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                                     <span style={{ fontSize: 12, opacity: 0.7 }}>{field.type}</span>
+                                    <Button
+                                        variant="tertiary"
+                                        isSmall
+                                        onClick={(e) => moveFieldUp(index, e)}
+                                        disabled={index <= 0}
+                                        title="Move field up"
+                                        style={{ minHeight: 'unset', padding: '2px 6px', fontSize: 12 }}
+                                    >
+                                        ↑
+                                    </Button>
+                                    <Button
+                                        variant="tertiary"
+                                        isSmall
+                                        onClick={(e) => moveFieldDown(index, e)}
+                                        disabled={index >= fields.length - 1}
+                                        title="Move field down"
+                                        style={{ minHeight: 'unset', padding: '2px 6px', fontSize: 12 }}
+                                    >
+                                        ↓
+                                    </Button>
                                     <Button
                                         variant="tertiary"
                                         isDestructive
@@ -334,6 +579,8 @@ function App() {
     const [activeGroup, setActiveGroup] = useState(defaultFieldGroup());
     const [error, setError] = useState('');
     const [snacks, setSnacks] = useState([]);
+    const [locationOptions, setLocationOptions] = useState({ post_types: [], taxonomies: [], user_roles: [] });
+    const [isLoadingLocationOptions, setIsLoadingLocationOptions] = useState(true);
 
     const showSnack = (status, content) => {
         setSnacks((prev) => [
@@ -356,8 +603,23 @@ function App() {
         }
     };
 
+    const fetchLocationOptions = async () => {
+        setIsLoadingLocationOptions(true);
+
+        try {
+            const response = await apiFetch({ path: `${config.restBase}/location-options` });
+            setLocationOptions(response || { post_types: [], taxonomies: [], user_roles: [] });
+        } catch (apiError) {
+            console.error('Failed to load location options:', apiError);
+            setLocationOptions({ post_types: [], taxonomies: [], user_roles: [] });
+        } finally {
+            setIsLoadingLocationOptions(false);
+        }
+    };
+
     useEffect(() => {
         fetchList();
+        fetchLocationOptions();
     }, []);
 
     const openNew = () => {
@@ -399,6 +661,50 @@ function App() {
             await fetchList();
         } catch (apiError) {
             showSnack('error', apiError?.message || 'Delete failed.');
+        }
+    };
+
+    const onMoveUp = async (index) => {
+        if (index <= 0) {
+            return;
+        }
+
+        const newItems = [...listItems];
+        [newItems[index - 1], newItems[index]] = [newItems[index], newItems[index - 1]];
+
+        try {
+            const slugs = newItems.map((item) => item.slug);
+            await apiFetch({
+                path: `${config.restBase}/field-groups/reorder`,
+                method: 'POST',
+                data: { slugs },
+            });
+
+            setListItems(newItems);
+        } catch (apiError) {
+            showSnack('error', apiError?.message || 'Reorder failed.');
+        }
+    };
+
+    const onMoveDown = async (index) => {
+        if (index >= listItems.length - 1) {
+            return;
+        }
+
+        const newItems = [...listItems];
+        [newItems[index], newItems[index + 1]] = [newItems[index + 1], newItems[index]];
+
+        try {
+            const slugs = newItems.map((item) => item.slug);
+            await apiFetch({
+                path: `${config.restBase}/field-groups/reorder`,
+                method: 'POST',
+                data: { slugs },
+            });
+
+            setListItems(newItems);
+        } catch (apiError) {
+            showSnack('error', apiError?.message || 'Reorder failed.');
         }
     };
 
@@ -491,6 +797,8 @@ function App() {
                     onAddNew={openNew}
                     onEdit={openEdit}
                     onDelete={deleteItem}
+                    onMoveUp={onMoveUp}
+                    onMoveDown={onMoveDown}
                 />
             ) : null}
 
@@ -513,6 +821,8 @@ function App() {
                                     activeFieldIndex={activeFieldIndex}
                                     onGroupChange={setActiveGroup}
                                     onFieldChange={updateField}
+                                    locationOptions={locationOptions}
+                                    isLoadingLocationOptions={isLoadingLocationOptions}
                                 />
                                 <MainCanvas
                                     group={activeGroup}

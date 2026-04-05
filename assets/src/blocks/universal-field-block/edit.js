@@ -67,15 +67,17 @@ function getFieldGroup(slug) {
 
 // ── SubfieldRenderer ─────────────────────────────────────────────────────────
 
-function SubfieldRenderer({ field, value, onChange }) {
+function SubfieldRenderer({ field, value, onChange, disabled = false }) {
     const type = field.type || 'text';
 
     if (type === 'textarea') {
         return (
             <TextareaControl
+                __nextHasNoMarginBottom
                 label={field.label}
                 help={field.help}
                 value={toStr(value)}
+                disabled={disabled}
                 onChange={onChange}
             />
         );
@@ -84,6 +86,8 @@ function SubfieldRenderer({ field, value, onChange }) {
     if (type === 'number') {
         return (
             <TextControl
+            __next40pxDefaultSize
+            __nextHasNoMarginBottom
                 label={field.label}
                 help={field.help}
                 type="number"
@@ -91,6 +95,7 @@ function SubfieldRenderer({ field, value, onChange }) {
                 max={field.max ?? undefined}
                 step={field.step ?? undefined}
                 value={toStr(value)}
+                disabled={disabled}
                 onChange={(v) => {
                     if (v === '') {
                         onChange('');
@@ -106,10 +111,13 @@ function SubfieldRenderer({ field, value, onChange }) {
     if (type === 'email') {
         return (
             <TextControl
+            __next40pxDefaultSize
+            __nextHasNoMarginBottom
                 label={field.label}
                 help={field.help}
                 type="email"
                 value={toStr(value)}
+                disabled={disabled}
                 onChange={onChange}
             />
         );
@@ -122,10 +130,13 @@ function SubfieldRenderer({ field, value, onChange }) {
         ];
         return (
             <SelectControl
+                __next40pxDefaultSize
+                __nextHasNoMarginBottom
                 label={field.label}
                 help={field.help}
                 value={toStr(value)}
                 options={options}
+                disabled={disabled}
                 onChange={onChange}
             />
         );
@@ -138,6 +149,7 @@ function SubfieldRenderer({ field, value, onChange }) {
                 help={field.help}
                 selected={toStr(value)}
                 options={normalizeChoices(field.choices)}
+                disabled={disabled}
                 onChange={onChange}
             />
         );
@@ -146,9 +158,11 @@ function SubfieldRenderer({ field, value, onChange }) {
     if (type === 'true_false') {
         return (
             <ToggleControl
+                        __nextHasNoMarginBottom
                 label={field.label}
                 help={field.help || `${field.on_text || 'On'} / ${field.off_text || 'Off'}`}
                 checked={Boolean(value)}
+                disabled={disabled}
                 onChange={(checked) => onChange(Boolean(checked))}
             />
         );
@@ -157,6 +171,7 @@ function SubfieldRenderer({ field, value, onChange }) {
     if (type === 'image') {
         const attachmentId = Number(value) || 0;
         const openMedia = () => {
+            if (disabled) return;
             if (!window.wp?.media) return;
             const frame = window.wp.media({
                 title: field.label || 'Select Image',
@@ -176,11 +191,11 @@ function SubfieldRenderer({ field, value, onChange }) {
                     {field.label || field.name}
                 </p>
                 <div style={{ display: 'flex', gap: 8 }}>
-                    <Button variant="secondary" isSmall onClick={openMedia}>
+                    <Button variant="secondary" isSmall disabled={disabled} onClick={openMedia}>
                         {attachmentId ? 'Replace Image' : 'Select Image'}
                     </Button>
                     {attachmentId > 0 && (
-                        <Button variant="tertiary" isDestructive isSmall onClick={() => onChange(0)}>
+                        <Button variant="tertiary" isDestructive isSmall disabled={disabled} onClick={() => onChange(0)}>
                             Remove
                         </Button>
                     )}
@@ -197,9 +212,12 @@ function SubfieldRenderer({ field, value, onChange }) {
     // Default: text
     return (
         <TextControl
+            __next40pxDefaultSize
+            __nextHasNoMarginBottom
             label={field.label}
             help={field.help}
             value={toStr(value)}
+            disabled={disabled}
             onChange={onChange}
         />
     );
@@ -229,6 +247,7 @@ export default function Edit({ name, attributes, setAttributes }) {
     const fieldGroupSlug = attributes.fieldGroupSlug || slugFromName;
     const group = getFieldGroup(fieldGroupSlug);
     const groupIcon = group?.block_icon || 'screenoptions';
+    const isReadOnly = Boolean(group?.readonly);
 
     // Assign a unique block instance ID on first render if not set.
     useEffect(() => {
@@ -267,6 +286,10 @@ export default function Edit({ name, attributes, setAttributes }) {
         .filter(Boolean);
 
     const updateField = (fieldName, value) => {
+        if (isReadOnly) {
+            return;
+        }
+
         setAttributes({ [fieldName]: value });
     };
 
@@ -277,7 +300,7 @@ export default function Edit({ name, attributes, setAttributes }) {
                 <ToolbarGroup>
                     <ToolbarButton
                         icon={pencil}
-                        label="Edit Data"
+                        label={isReadOnly ? 'View Data (Read Only)' : 'Edit Data'}
                         onClick={() => setIsModalOpen(true)}
                     />
                 </ToolbarGroup>
@@ -291,7 +314,7 @@ export default function Edit({ name, attributes, setAttributes }) {
                     instructions={group.block_description || 'Click "Edit Data" to configure this block.'}
                 >
                     <Button variant="primary" onClick={() => setIsModalOpen(true)}>
-                        Edit Data
+                        {isReadOnly ? 'View Data' : 'Edit Data'}
                     </Button>
                 </Placeholder>
             )}
@@ -322,7 +345,7 @@ export default function Edit({ name, attributes, setAttributes }) {
                                 </strong>
                             </div>
                             <Button variant="primary" isSmall onClick={() => setIsModalOpen(true)}>
-                                Edit Data
+                                {isReadOnly ? 'View Data' : 'Edit Data'}
                             </Button>
                         </div>
 
@@ -344,11 +367,17 @@ export default function Edit({ name, attributes, setAttributes }) {
                     onRequestClose={() => setIsModalOpen(false)}
                 >
                     <div style={{ minWidth: 480 }}>
+                        {isReadOnly && (
+                            <p style={{ marginTop: 0, marginBottom: 16, padding: 10, background: '#f0f6fc', border: '1px solid #c3dcf6', borderRadius: 2 }}>
+                                Read Only: You lack permissions to edit this data.
+                            </p>
+                        )}
                         {fields.map((field) => (
                             <SubfieldRenderer
                                 key={field.name}
                                 field={field}
                                 value={attributes[field.name]}
+                                disabled={isReadOnly}
                                 onChange={(val) => updateField(field.name, val)}
                             />
                         ))}

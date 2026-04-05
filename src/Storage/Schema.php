@@ -123,7 +123,7 @@ final class Schema
      * that belongs to a group with a custom_table_name.
      *
      * @param array<int, array<string, mixed>> $definitions
-     * @return array<string, array{table: string, format: string, field_type: string}>
+    * @return array<string, array{table: string, format: string, field_type: string, group_slug: string}>
      */
     public function build_meta_key_map(array $definitions): array
     {
@@ -137,6 +137,7 @@ final class Schema
             }
 
             $tableName = $this->get_table_name($customTableName);
+            $groupSlug = sanitize_key((string) ($definition['name'] ?? ''));
             $fields    = is_array($definition['fields'] ?? null) ? $definition['fields'] : [];
 
             foreach ($fields as $field) {
@@ -151,6 +152,7 @@ final class Schema
                     'table'      => $tableName,
                     'format'     => $this->get_column_format($fieldType, $field),
                     'field_type' => $fieldType,
+                    'group_slug' => $groupSlug,
                 ];
 
                 // Attach child table reference for repeater fields.

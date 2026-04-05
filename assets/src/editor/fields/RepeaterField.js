@@ -122,6 +122,7 @@ function SubfieldInput({ subfield, value, onChange }) {
     if (type === 'textarea') {
         return (
             <TextareaControl
+                __nextHasNoMarginBottom
                 label={subfield.label || subfield.name}
                 value={String(value ?? '')}
                 onChange={onChange}
@@ -132,6 +133,8 @@ function SubfieldInput({ subfield, value, onChange }) {
     if (type === 'number') {
         return (
             <TextControl
+            __next40pxDefaultSize
+            __nextHasNoMarginBottom
                 label={subfield.label || subfield.name}
                 type="number"
                 value={String(value ?? '')}
@@ -143,6 +146,8 @@ function SubfieldInput({ subfield, value, onChange }) {
     if (type === 'email') {
         return (
             <TextControl
+            __next40pxDefaultSize
+            __nextHasNoMarginBottom
                 label={subfield.label || subfield.name}
                 type="email"
                 value={String(value ?? '')}
@@ -203,6 +208,8 @@ function SubfieldInput({ subfield, value, onChange }) {
     // Default: text
     return (
         <TextControl
+            __next40pxDefaultSize
+            __nextHasNoMarginBottom
             label={subfield.label || subfield.name}
             value={String(value ?? '')}
             onChange={onChange}

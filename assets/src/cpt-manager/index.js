@@ -279,48 +279,62 @@ function CptManagerApp() {
                         <strong>{selectedItem ? `Edit ${selectedItem.slug}` : 'Create New CPT'}</strong>
                     </CardHeader>
                     <CardBody>
-                        <TextControl
-                            label="Slug"
-                            help="Lowercase letters, numbers and dashes only."
-                            value={draft.slug}
-                            onChange={onSlugChange}
-                        />
+                        <div style={{ display: 'grid', gap: 12 }}>
+                            <TextControl
+                                __next40pxDefaultSize
+                                __nextHasNoMarginBottom
+                                label="Slug"
+                                help="Lowercase letters, numbers and dashes only."
+                                value={draft.slug}
+                                onChange={onSlugChange}
+                            />
 
-                        <TextControl
-                            label="Singular Label"
-                            value={draft.singular}
-                            onChange={(value) => {
-                                setLabelTouched((prev) => ({ ...prev, singular: true }));
-                                setDraft((prev) => ({ ...prev, singular: value }));
-                            }}
-                        />
+                            <TextControl
+                                __next40pxDefaultSize
+                                __nextHasNoMarginBottom
+                                label="Singular Label"
+                                value={draft.singular}
+                                onChange={(value) => {
+                                    setLabelTouched((prev) => ({ ...prev, singular: true }));
+                                    setDraft((prev) => ({ ...prev, singular: value }));
+                                }}
+                            />
 
-                        <TextControl
-                            label="Plural Label"
-                            value={draft.plural}
-                            onChange={(value) => {
-                                setLabelTouched((prev) => ({ ...prev, plural: true }));
-                                setDraft((prev) => ({ ...prev, plural: value }));
-                            }}
-                        />
+                            <TextControl
+                                __next40pxDefaultSize
+                                __nextHasNoMarginBottom
+                                label="Plural Label"
+                                value={draft.plural}
+                                onChange={(value) => {
+                                    setLabelTouched((prev) => ({ ...prev, plural: true }));
+                                    setDraft((prev) => ({ ...prev, plural: value }));
+                                }}
+                            />
+                        </div>
 
                         <Panel>
                             <PanelBody title="Supports" initialOpen>
-                                {SUPPORT_OPTIONS.map((option) => (
-                                    <CheckboxControl
-                                        key={option.key}
-                                        label={option.label}
-                                        checked={draft.supports.includes(option.key)}
-                                        onChange={(enabled) => updateSupport(option.key, enabled)}
-                                    />
-                                ))}
+                                <div style={{ display: 'grid', gap: 8 }}>
+                                    {SUPPORT_OPTIONS.map((option) => (
+                                        <CheckboxControl
+                                            __nextHasNoMarginBottom
+                                            key={option.key}
+                                            label={option.label}
+                                            checked={draft.supports.includes(option.key)}
+                                            onChange={(enabled) => updateSupport(option.key, enabled)}
+                                        />
+                                    ))}
+                                </div>
                             </PanelBody>
                             <PanelBody title="Enterprise Features" initialOpen>
-                                <ToggleControl
-                                    label="Enable Custom Table Engine for this CPT"
-                                    checked={draft.customTableEnabled}
-                                    onChange={(enabled) => setDraft((prev) => ({ ...prev, customTableEnabled: enabled }))}
-                                />
+                                <div style={{ display: 'grid', gap: 8 }}>
+                                    <ToggleControl
+                                        __nextHasNoMarginBottom
+                                        label="Enable Custom Table Engine for this CPT"
+                                        checked={draft.customTableEnabled}
+                                        onChange={(enabled) => setDraft((prev) => ({ ...prev, customTableEnabled: enabled }))}
+                                    />
+                                </div>
                             </PanelBody>
                         </Panel>
 

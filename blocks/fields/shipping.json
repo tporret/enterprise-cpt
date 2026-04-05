@@ -1,0 +1,75 @@
+{
+    "type": "field_group",
+    "name": "shipping",
+    "title": "Shipping",
+    "post_type": "post",
+    "location_rules": [
+        {
+            "param": "post_type",
+            "operator": "==",
+            "value": "post"
+        }
+    ],
+    "custom_table_name": "",
+    "fields": [
+        {
+            "type": "text",
+            "name": "enterprise_cpt_field_1_updated",
+            "label": "Field 1 updated",
+            "help": "",
+            "show_in_rest": true,
+            "single": true,
+            "default": "",
+            "min": "",
+            "max": "",
+            "step": "",
+            "on_text": "On",
+            "off_text": "Off",
+            "choices": [],
+            "rows": []
+        },
+        {
+            "type": "number",
+            "name": "enterprise_cpt_field_2",
+            "label": "Field 2",
+            "help": "",
+            "show_in_rest": true,
+            "single": true,
+            "default": "",
+            "min": "",
+            "max": "",
+            "step": "",
+            "on_text": "On",
+            "off_text": "Off",
+            "choices": [],
+            "rows": []
+        },
+        {
+            "type": "true_false",
+            "name": "enterprise_cpt_field_3",
+            "label": "Field 3",
+            "help": "",
+            "show_in_rest": true,
+            "single": true,
+            "default": false,
+            "min": "",
+            "max": "",
+            "step": "",
+            "on_text": "On",
+            "off_text": "Off",
+            "choices": [],
+            "rows": []
+        }
+    ],
+    "is_block": true,
+    "block_icon": "format-image",
+    "block_category": "enterprise-cpt",
+    "block_description": "a cpt block",
+    "block_slug": "shipping",
+    "permissions": {
+        "minimum_role": "any",
+        "custom_capability": "",
+        "read_only": false
+    },
+    "_file": "/var/www/html/wp-content/plugins/enterprise-cpt/blocks/fields/shipping.json"
+}

@@ -10,9 +10,9 @@ final class UserRoleRule implements RuleInterface
 {
     private string $operator;
 
-    private string $value;
+    private array|string $value;
 
-    public function __construct(string $operator, string $value)
+    public function __construct(string $operator, array|string $value)
     {
         $this->operator = $operator;
         $this->value = $value;
@@ -31,6 +31,15 @@ final class UserRoleRule implements RuleInterface
         }
 
         $normalizedRoles = array_map(static fn (string $role): string => sanitize_key($role), $roles);
+
+        // Handle array values (multi-select)
+        if (is_array($this->value)) {
+            $normalizedValues = array_map(static fn (string $val): string => sanitize_key($val), $this->value);
+            $matches = count(array_intersect($normalizedRoles, $normalizedValues)) > 0;
+            return $this->operator === '!=' ? !$matches : $matches;
+        }
+
+        // Handle single string values (legacy)
         $hasRole = in_array($this->value, $normalizedRoles, true);
 
         return match ($this->operator) {

@@ -4,19 +4,25 @@ declare(strict_types=1);
 
 namespace EnterpriseCPT\Storage;
 
+use EnterpriseCPT\Security\PermissionResolver;
+use WP_Error;
+
 final class Interceptor
 {
     /**
-     * @var array<string, array{table: string, format: string, field_type: string}>
+        * @var array<string, array{table: string, format: string, field_type: string, group_slug: string}>
      */
     private array $metaKeyMap;
 
+        private PermissionResolver $permissionResolver;
+
     /**
-     * @param array<string, array{table: string, format: string, field_type: string}> $metaKeyMap
+     * @param array<string, array{table: string, format: string, field_type: string, group_slug: string}> $metaKeyMap
      */
-    public function __construct(array $metaKeyMap)
+    public function __construct(array $metaKeyMap, PermissionResolver $permissionResolver)
     {
         $this->metaKeyMap = $metaKeyMap;
+        $this->permissionResolver = $permissionResolver;
     }
 
     /**
@@ -90,6 +96,12 @@ final class Interceptor
             return $check;
         }
 
+        $permissionError = $this->assertCanWriteMeta($metaKey);
+
+        if ($permissionError !== null) {
+            return $permissionError;
+        }
+
         $mapping = $this->metaKeyMap[$metaKey];
         ['table' => $tableName, 'format' => $format] = $mapping;
 
@@ -123,6 +135,12 @@ final class Interceptor
             return $check;
         }
 
+        $permissionError = $this->assertCanWriteMeta($metaKey);
+
+        if ($permissionError !== null) {
+            return $permissionError;
+        }
+
         ['table' => $tableName, 'format' => $format] = $this->metaKeyMap[$metaKey];
 
         $added = $this->upsert_column($tableName, $objectId, $metaKey, $metaValue, $format);
@@ -147,6 +165,12 @@ final class Interceptor
     ): mixed {
         if (! isset($this->metaKeyMap[$metaKey])) {
             return $check;
+        }
+
+        $permissionError = $this->assertCanWriteMeta($metaKey);
+
+        if ($permissionError !== null) {
+            return $permissionError;
         }
 
         ['table' => $tableName, 'format' => $format, 'field_type' => $fieldType] = $this->metaKeyMap[$metaKey];
@@ -230,6 +254,33 @@ final class Interceptor
     private function cache_key(string $tableName, int $postId): string
     {
         return $tableName . '_' . $postId;
+    }
+
+    private function assertCanWriteMeta(string $metaKey): ?WP_Error
+    {
+        $mapping = $this->metaKeyMap[$metaKey] ?? null;
+
+        if (! is_array($mapping)) {
+            return null;
+        }
+
+        $groupSlug = sanitize_key((string) ($mapping['group_slug'] ?? ''));
+
+        if ($groupSlug === '') {
+            return null;
+        }
+
+        $accessLevel = $this->permissionResolver->get_user_access_level($groupSlug, get_current_user_id());
+
+        if ($accessLevel === PermissionResolver::ACCESS_FULL) {
+            return null;
+        }
+
+        return new WP_Error(
+            'enterprise_cpt_forbidden_field_write',
+            sprintf('You do not have permission to update protected field "%s".', $metaKey),
+            ['status' => 403]
+        );
     }
 
     // -------------------------------------------------------------------------

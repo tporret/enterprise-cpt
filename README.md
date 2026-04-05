@@ -12,6 +12,9 @@ This repository is developer-focused and documents architecture, APIs, and local
 - Repeater Focus Canvas editor with drag-and-drop sorting, pencil/copy/trash icon actions, centered modal with Done/Discard footer, and clone snackbar notification
 - Repeater media workflow: bulk image row creation and inline image preview/edit controls
 - **Field-to-Block Bridge**: turn any field group into a Gutenberg block with `is_block: true`
+- Field Group drag-and-drop reordering with auto-save
+- Field reordering within field group editor with drag-and-drop
+- **Multi-Select Location Rules**: field groups can now appear on multiple post types, taxonomies, or user roles simultaneously
 - JSON-backed definitions with DB buffer fallback for read-only environments
 - Optional custom table storage per field group
 - Metadata interception, cache layer, hydrator, and shadow sync
@@ -64,6 +67,8 @@ Base namespace: `enterprise-cpt/v1`
   - Saves field group definition
 - `DELETE /field-groups/{slug}`
   - Deletes from JSON and/or DB buffer
+- `GET /location-options`
+  - Returns available post types, taxonomies, and user roles for location rule selection
 
 ### Field Type Library
 
@@ -241,6 +246,79 @@ Add `"is_block": true` to any field group JSON in `blocks/fields/`:
 ```
 
 The block will appear in the **Enterprise CPT** block category in the block inserter.
+
+## Multi-Select Location Rules
+
+Field groups can now appear on multiple post types, taxonomies, or user roles simultaneously using multi-select location rules.
+
+### How It Works
+
+Location rules use an **OR logic** model:
+- Select multiple values for a single rule type (e.g., "Post Type")
+- The field group appears on **any** of the selected values
+
+```json
+{
+  "type": "field_group",
+  "name": "product_info",
+  "location_rules": [
+    {
+      "param": "post_type",
+      "operator": "==",
+      "value": ["product", "service", "downloadable"]
+    }
+  ]
+}
+```
+
+This field group will appear on the **Product**, **Service**, and **Downloadable** post types.
+
+### Supported Rule Types
+
+- `post_type`: Post type names (e.g., `post`, `page`, `product`)
+- `taxonomy`: Taxonomy names (e.g., `category`, `post_tag`)
+- `user_role`: User role slugs (e.g., `administrator`, `editor`)
+
+### UI Experience
+
+In the Field Groups editor:
+
+1. Open a field group and scroll to **Location Rules**
+2. Choose the rule type: Post Type, Taxonomy, or User Role
+3. Check multiple values using the checkbox grid
+4. Save the field group
+
+The rule evaluation logic (`PostTypeRule`, `TaxonomyRule`, `UserRoleRule`) handles both:
+- **Array values** (multi-select): matches if the context matches ANY value in the array
+- **String values** (legacy): maintains backward compatibility with single-value rules
+
+### REST API
+
+The editor requests available options via:
+
+```
+GET /wp-json/enterprise-cpt/v1/location-options
+```
+
+Response:
+
+```json
+{
+  "post_types": [
+    { "value": "post", "label": "Posts" },
+    { "value": "page", "label": "Pages" },
+    { "value": "product", "label": "Products" }
+  ],
+  "taxonomies": [
+    { "value": "category", "label": "Categories" },
+    { "value": "post_tag", "label": "Tags" }
+  ],
+  "user_roles": [
+    { "value": "administrator", "label": "Administrator" },
+    { "value": "editor", "label": "Editor" }
+  ]
+}
+```
 
 ### Template Authoring Contract
 

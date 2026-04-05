@@ -31,16 +31,21 @@ function FieldControl({ field, value, onChange }) {
     const fieldType = field.type || 'text';
 
     if (fieldType === 'textarea') {
-        return <TextareaControl label={field.label} help={field.help} value={toStringValue(value)} onChange={onChange} />;
+        return <TextareaControl
+                __nextHasNoMarginBottom label={field.label} help={field.help} value={toStringValue(value)} onChange={onChange} />;
     }
 
     if (fieldType === 'email') {
-        return <TextControl label={field.label} help={field.help} type="email" value={toStringValue(value)} onChange={onChange} />;
+        return <TextControl
+            __next40pxDefaultSize
+            __nextHasNoMarginBottom label={field.label} help={field.help} type="email" value={toStringValue(value)} onChange={onChange} />;
     }
 
     if (fieldType === 'number') {
         return (
             <TextControl
+            __next40pxDefaultSize
+            __nextHasNoMarginBottom
                 label={field.label}
                 help={field.help}
                 type="number"
@@ -68,6 +73,8 @@ function FieldControl({ field, value, onChange }) {
 
         return (
             <SelectControl
+                __next40pxDefaultSize
+                __nextHasNoMarginBottom
                 label={field.label}
                 help={field.help}
                 value={toStringValue(value)}
@@ -94,6 +101,7 @@ function FieldControl({ field, value, onChange }) {
     if (fieldType === 'true_false') {
         return (
             <ToggleControl
+                        __nextHasNoMarginBottom
                 label={field.label}
                 help={field.help || `${field.onText || 'On'} / ${field.offText || 'Off'}`}
                 checked={Boolean(value)}
@@ -112,7 +120,9 @@ function FieldControl({ field, value, onChange }) {
         );
     }
 
-    return <TextControl label={field.label} help={field.help} value={toStringValue(value)} onChange={onChange} />;
+    return <TextControl
+            __next40pxDefaultSize
+            __nextHasNoMarginBottom label={field.label} help={field.help} value={toStringValue(value)} onChange={onChange} />;
 }
 
 function TextFieldPanel() {

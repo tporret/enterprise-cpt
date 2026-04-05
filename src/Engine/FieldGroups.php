@@ -55,6 +55,14 @@ final class FieldGroups
         if (! $this->is_readonly_env()) {
             $targetFile = $this->storagePath . DIRECTORY_SEPARATOR . $normalizedSlug . '.json';
             file_put_contents($targetFile, (string) wp_json_encode($definition, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+
+            // Remove any stale DB-buffer copy so filesystem remains source-of-truth.
+            $buffer = get_option($this->bufferOptionName, []);
+            if (is_array($buffer) && array_key_exists($normalizedSlug, $buffer)) {
+                unset($buffer[$normalizedSlug]);
+                update_option($this->bufferOptionName, $buffer, false);
+            }
+
             $this->flushCaches();
             do_action('enterprise_cpt/field_group_saved', $normalizedSlug, $definition);
 
@@ -201,6 +209,7 @@ final class FieldGroups
         $definition['block_icon'] = sanitize_text_field((string) ($definition['block_icon'] ?? ''));
         $definition['block_category'] = sanitize_key((string) ($definition['block_category'] ?? 'enterprise-cpt'));
         $definition['block_description'] = sanitize_text_field((string) ($definition['block_description'] ?? ''));
+        $definition['permissions'] = $this->normalizePermissions($definition['permissions'] ?? []);
         $definition['block_slug'] = $definition['is_block']
             ? $this->normalizeBlockSlug((string) ($definition['block_slug'] ?? $slug), $slug)
             : '';
@@ -227,6 +236,25 @@ final class FieldGroups
         $slug = preg_replace('/-+/', '-', $slug) ?? '';
 
         return trim($slug, '-');
+    }
+
+    private function normalizePermissions(mixed $permissions): array
+    {
+        $permissions = is_array($permissions) ? $permissions : [];
+
+        $minimumRole = sanitize_key((string) ($permissions['minimum_role'] ?? 'any'));
+        $customCapability = sanitize_key((string) ($permissions['custom_capability'] ?? ''));
+        $readOnly = (bool) ($permissions['read_only'] ?? ($permissions['readonly'] ?? false));
+
+        if (! in_array($minimumRole, ['any', 'contributor', 'author', 'editor', 'administrator'], true)) {
+            $minimumRole = 'any';
+        }
+
+        return [
+            'minimum_role' => $minimumRole,
+            'custom_capability' => $customCapability,
+            'read_only' => $readOnly,
+        ];
     }
 
     private function normalizeLocationRules(mixed $rules): array

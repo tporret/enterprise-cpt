@@ -1,0 +1,74 @@
+{
+    "type": "field_group",
+    "name": "product_fields",
+    "title": "Product Fields",
+    "post_type": "product",
+    "location_rules": [
+        {
+            "param": "post_type",
+            "operator": "==",
+            "value": "product"
+        }
+    ],
+    "custom_table_name": "enterprise_cpt_products",
+    "fields": [
+        {
+            "type": "text",
+            "name": "enterprise_cpt_sku",
+            "label": "SKU",
+            "help": "Primary stock keeping unit for the product record.",
+            "show_in_rest": true,
+            "single": true,
+            "default": "",
+            "min": "",
+            "max": "",
+            "step": "",
+            "on_text": "On",
+            "off_text": "Off",
+            "choices": [],
+            "rows": []
+        },
+        {
+            "type": "repeater",
+            "name": "enterprise_cpt_variants",
+            "label": "Variants",
+            "help": "",
+            "show_in_rest": true,
+            "single": true,
+            "default": "",
+            "min": "",
+            "max": "",
+            "step": "",
+            "on_text": "On",
+            "off_text": "Off",
+            "choices": [],
+            "rows": [
+                {
+                    "name": "variant_name",
+                    "label": "Variant Name",
+                    "type": "text",
+                    "image_size": "medium",
+                    "image_link": "none"
+                },
+                {
+                    "name": "price",
+                    "label": "Price",
+                    "type": "number",
+                    "image_size": "medium",
+                    "image_link": "none"
+                }
+            ]
+        }
+    ],
+    "is_block": false,
+    "block_icon": "",
+    "block_category": "enterprise-cpt",
+    "block_description": "",
+    "permissions": {
+        "minimum_role": "any",
+        "custom_capability": "",
+        "read_only": false
+    },
+    "block_slug": "",
+    "_file": "/var/www/html/wp-content/plugins/enterprise-cpt/blocks/fields/products-fields.json"
+}

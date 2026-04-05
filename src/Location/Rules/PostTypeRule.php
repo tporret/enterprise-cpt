@@ -10,9 +10,9 @@ final class PostTypeRule implements RuleInterface
 {
     private string $operator;
 
-    private string $value;
+    private array|string $value;
 
-    public function __construct(string $operator, string $value)
+    public function __construct(string $operator, array|string $value)
     {
         $this->operator = $operator;
         $this->value = $value;
@@ -26,6 +26,13 @@ final class PostTypeRule implements RuleInterface
             return false;
         }
 
+        // Handle array values (multi-select)
+        if (is_array($this->value)) {
+            $matches = in_array($postType, $this->value, true);
+            return $this->operator === '!=' ? !$matches : $matches;
+        }
+
+        // Handle single string values (legacy)
         return match ($this->operator) {
             '!=' => $postType !== $this->value,
             default => $postType === $this->value,

@@ -18,6 +18,7 @@ use EnterpriseCPT\Location\RuleFactory;
 use EnterpriseCPT\Rest\BlockRendererController;
 use EnterpriseCPT\Rest\CPTController;
 use EnterpriseCPT\Rest\FieldGroupController;
+use EnterpriseCPT\Security\PermissionResolver;
 use EnterpriseCPT\Storage\Hydrator;
 use EnterpriseCPT\Storage\Interceptor;
 use EnterpriseCPT\Storage\Schema;
@@ -69,6 +70,8 @@ final class Plugin
 
     private Scaffolder $templateScaffolder;
 
+    private PermissionResolver $permissionResolver;
+
     public static function boot(string $pluginFile): self
     {
         if (self::$instance === null) {
@@ -83,8 +86,9 @@ final class Plugin
         $this->pluginFile = $pluginFile;
         $this->cptEngine = new CPT(ENTERPRISE_CPT_PATH . 'definitions/cpt');
         $this->fieldGroupEngine = new FieldGroups(ENTERPRISE_CPT_PATH . 'blocks/fields');
+        $this->permissionResolver = new PermissionResolver($this->fieldGroupEngine);
         $this->fieldRegistrar = new FieldRegistrar();
-        $this->fieldGroupController = new FieldGroupController($this->fieldGroupEngine);
+        $this->fieldGroupController = new FieldGroupController($this->fieldGroupEngine, $this->permissionResolver);
         $this->cptController = new CPTController($this->cptEngine, ENTERPRISE_CPT_PATH . 'definitions/cpt');
         $this->blockRendererController = new BlockRendererController($this->fieldGroupEngine);
         $this->locationCompiler = new Compiler(
@@ -99,7 +103,7 @@ final class Plugin
 
         $this->storageSchema = new Schema();
         $metaKeyMap = $this->storageSchema->build_meta_key_map($this->fieldGroupEngine->definitionList());
-        $this->storageInterceptor = new Interceptor($metaKeyMap);
+        $this->storageInterceptor = new Interceptor($metaKeyMap, $this->permissionResolver);
         $this->storageHydrator = new Hydrator($metaKeyMap);
         $this->storageInterceptor->register();
 
@@ -123,6 +127,7 @@ final class Plugin
         add_action('init', [$this, 'registerBlocks'], 8);
         add_filter('the_content', [$this, 'appendFrontendFieldGroups'], 20);
         add_filter('block_categories_all', [$this, 'registerBlockCategory'], 10, 2);
+        add_filter('allowed_block_types_all', [$this, 'filterAllowedBlockTypes'], 10, 2);
         add_filter('rest_pre_insert_post', [$this, 'syncBlockFieldsToCustomTable'], 10, 2);
         add_action('enqueue_block_editor_assets', [$this, 'enqueueBlockEditorAssets']);
         add_action('enqueue_block_editor_assets', [$this, 'enqueueBlockAssets']);
@@ -420,6 +425,8 @@ final class Plugin
 
     private function enqueueFieldGroupAssets(): void
     {
+        $this->enqueueWordPressComponentStyles();
+
         $scriptPath = ENTERPRISE_CPT_PATH . 'assets/build/editor/editor.js';
         $assetPath = ENTERPRISE_CPT_PATH . 'assets/build/editor/editor.asset.php';
         $stylePath = ENTERPRISE_CPT_PATH . 'assets/build/editor/editor.css';
@@ -465,6 +472,8 @@ final class Plugin
 
     private function enqueueCptManagerAssets(): void
     {
+        $this->enqueueWordPressComponentStyles();
+
         $scriptPath = ENTERPRISE_CPT_PATH . 'assets/build/cpt-manager/cpt-manager.js';
         $assetPath = ENTERPRISE_CPT_PATH . 'assets/build/cpt-manager/cpt-manager.asset.php';
 
@@ -493,6 +502,12 @@ final class Plugin
         );
 
         wp_enqueue_script('enterprise-cpt-manager');
+    }
+
+    private function enqueueWordPressComponentStyles(): void
+    {
+        // Ensure @wordpress/components controls render with full admin styling outside the editor canvas.
+        wp_enqueue_style('wp-components');
     }
 
     public function renderFieldGroupsPage(): void
@@ -753,8 +768,10 @@ final class Plugin
 
     private function editorBootstrapData(): array
     {
+        $fieldGroups = $this->filterFieldGroupsForCurrentUser($this->fieldGroupDefinitions(), get_current_user_id());
+
         return [
-            'fieldGroups' => $this->fieldGroupDefinitions(),
+            'fieldGroups' => $fieldGroups,
             'restBase'    => rest_url('enterprise-cpt/v1'),
             'nonce'       => wp_create_nonce('wp_rest'),
         ];
@@ -813,7 +830,7 @@ final class Plugin
      * Parses post_content for enterprise-cpt/* blocks, extracts attributes,
      * and upserts into the custom table keyed by block_instance_id.
      */
-    public function syncBlockFieldsToCustomTable(\stdClass $prepared, \WP_REST_Request $request): \stdClass
+    public function syncBlockFieldsToCustomTable(\stdClass $prepared, \WP_REST_Request $request): \stdClass|\WP_Error
     {
         $content = $prepared->post_content ?? '';
 
@@ -873,6 +890,17 @@ final class Plugin
 
             if ($instanceId === '') {
                 continue;
+            }
+
+            $groupSlug = sanitize_key((string) ($group['name'] ?? ''));
+            $accessLevel = $this->permissionResolver->get_user_access_level($groupSlug, get_current_user_id());
+
+            if ($accessLevel !== PermissionResolver::ACCESS_FULL) {
+                return new \WP_Error(
+                    'enterprise_cpt_forbidden_block_write',
+                    sprintf('You do not have permission to edit block data for group "%s".', $groupSlug),
+                    ['status' => 403]
+                );
             }
 
             $this->upsertBlockData($group, $postId, $instanceId, $attrs);
@@ -949,5 +977,78 @@ final class Plugin
         $slug = preg_replace('/-+/', '-', $slug) ?? '';
 
         return trim($slug, '-');
+    }
+
+    private function filterFieldGroupsForCurrentUser(array $groups, int $userId): array
+    {
+        $filtered = [];
+
+        foreach ($groups as $group) {
+            if (! is_array($group)) {
+                continue;
+            }
+
+            $accessLevel = $this->permissionResolver->get_definition_access_level($group, $userId);
+
+            if ($accessLevel === PermissionResolver::ACCESS_NONE) {
+                continue;
+            }
+
+            if ($accessLevel === PermissionResolver::ACCESS_READ_ONLY) {
+                $group['readonly'] = true;
+            }
+
+            $filtered[] = $group;
+        }
+
+        return $filtered;
+    }
+
+    public function filterAllowedBlockTypes(bool|array $allowedBlockTypes, \WP_Block_Editor_Context $context): bool|array
+    {
+        $blocked = [];
+        $userId = get_current_user_id();
+
+        foreach ($this->fieldGroupDefinitions() as $group) {
+            if (! is_array($group) || empty($group['is_block'])) {
+                continue;
+            }
+
+            $groupSlug = sanitize_key((string) ($group['name'] ?? ''));
+
+            if ($groupSlug === '') {
+                continue;
+            }
+
+            $accessLevel = $this->permissionResolver->get_user_access_level($groupSlug, $userId);
+
+            if ($accessLevel !== PermissionResolver::ACCESS_NONE) {
+                continue;
+            }
+
+            $blockSlug = sanitize_key((string) ($group['block_slug'] ?? ''));
+
+            if ($blockSlug === '') {
+                $blockSlug = $this->toBlockSlug($groupSlug);
+            }
+
+            $blocked[] = 'enterprise-cpt/' . $blockSlug;
+        }
+
+        if ($blocked === []) {
+            return $allowedBlockTypes;
+        }
+
+        if ($allowedBlockTypes === true) {
+            $all = array_keys(\WP_Block_Type_Registry::get_instance()->get_all_registered());
+
+            return array_values(array_diff($all, $blocked));
+        }
+
+        if (is_array($allowedBlockTypes)) {
+            return array_values(array_diff($allowedBlockTypes, $blocked));
+        }
+
+        return $allowedBlockTypes;
     }
 }

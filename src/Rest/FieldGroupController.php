@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace EnterpriseCPT\Rest;
 
 use EnterpriseCPT\Engine\FieldGroups;
+use EnterpriseCPT\Security\PermissionResolver;
 use WP_Error;
 use WP_REST_Request;
 use WP_REST_Response;
@@ -15,9 +16,12 @@ final class FieldGroupController
 
     private FieldGroups $fieldGroups;
 
-    public function __construct(FieldGroups $fieldGroups)
+    private PermissionResolver $permissionResolver;
+
+    public function __construct(FieldGroups $fieldGroups, PermissionResolver $permissionResolver)
     {
         $this->fieldGroups = $fieldGroups;
+        $this->permissionResolver = $permissionResolver;
     }
 
     public function register_routes(): void
@@ -64,6 +68,16 @@ final class FieldGroupController
 
         register_rest_route(
             self::NAMESPACE,
+            '/field-groups/reorder',
+            [
+                'methods' => 'POST',
+                'callback' => [$this, 'reorder_items'],
+                'permission_callback' => [$this, 'can_manage'],
+            ]
+        );
+
+        register_rest_route(
+            self::NAMESPACE,
             '/search',
             [
                 'methods' => 'GET',
@@ -88,16 +102,35 @@ final class FieldGroupController
                 ],
             ]
         );
+
+        register_rest_route(
+            self::NAMESPACE,
+            '/location-options',
+            [
+                'methods'             => 'GET',
+                'callback'            => [$this, 'get_location_options'],
+                'permission_callback' => [$this, 'can_manage'],
+            ]
+        );
     }
 
     public function get_items(): WP_REST_Response
     {
         $items = [];
+        $userId = get_current_user_id();
+        $definitions = $this->fieldGroups->definitionList();
+        $order = $this->get_field_group_order();
 
-        foreach ($this->fieldGroups->definitionList() as $definition) {
+        foreach ($definitions as $definition) {
             $slug = sanitize_key((string) ($definition['name'] ?? ''));
 
             if ($slug === '') {
+                continue;
+            }
+
+            $accessLevel = $this->permissionResolver->get_user_access_level($slug, $userId);
+
+            if ($accessLevel === PermissionResolver::ACCESS_NONE) {
                 continue;
             }
 
@@ -110,8 +143,17 @@ final class FieldGroupController
                 'title' => (string) ($definition['title'] ?? $slug),
                 'locations' => $locationSummary,
                 'custom_table_status' => $hasCustomTable ? 'custom_table' : 'postmeta',
+                'readonly' => $accessLevel === PermissionResolver::ACCESS_READ_ONLY,
             ];
         }
+
+        usort($items, static function (array $a, array $b) use ($order): int {
+            $posA = array_search($a['slug'], $order, true);
+            $posB = array_search($b['slug'], $order, true);
+            $posA = $posA !== false ? $posA : PHP_INT_MAX;
+            $posB = $posB !== false ? $posB : PHP_INT_MAX;
+            return $posA <=> $posB;
+        });
 
         return new WP_REST_Response($items);
     }
@@ -130,6 +172,16 @@ final class FieldGroupController
             return new WP_Error('enterprise_cpt_field_group_not_found', 'Field group not found.', ['status' => 404]);
         }
 
+        $accessLevel = $this->permissionResolver->get_user_access_level($slug, get_current_user_id());
+
+        if ($accessLevel === PermissionResolver::ACCESS_NONE) {
+            return new WP_Error('enterprise_cpt_field_group_not_found', 'Field group not found.', ['status' => 404]);
+        }
+
+        if ($accessLevel === PermissionResolver::ACCESS_READ_ONLY) {
+            $definition['readonly'] = true;
+        }
+
         return new WP_REST_Response($definition, 200);
     }
 
@@ -146,6 +198,10 @@ final class FieldGroupController
         if (! $deleted) {
             return new WP_Error('enterprise_cpt_delete_failed', 'Field group could not be deleted.', ['status' => 404]);
         }
+
+        $order = $this->get_field_group_order();
+        $order = array_filter($order, static fn (string $s): bool => $s !== $slug);
+        $this->set_field_group_order($order);
 
         return new WP_REST_Response(['deleted' => true, 'slug' => $slug], 200);
     }
@@ -202,12 +258,95 @@ final class FieldGroupController
             delete_transient('enterprise_cpt_scaffold_warning_' . $slug);
         }
 
+        // Update order when a field group is saved
+        $order = $this->get_field_group_order();
+        if (! in_array($slug, $order, true)) {
+            $order[] = $slug;
+            $this->set_field_group_order($order);
+        }
+
         return new WP_REST_Response($response, 200);
+    }
+
+    public function reorder_items(WP_REST_Request $request): WP_REST_Response|WP_Error
+    {
+        $slugs = $request->get_param('slugs');
+
+        if (! is_array($slugs)) {
+            return new WP_Error(
+                'enterprise_cpt_invalid_reorder',
+                'A valid array of slugs is required.',
+                ['status' => 400]
+            );
+        }
+
+        $this->set_field_group_order($slugs);
+
+        return new WP_REST_Response(['success' => true, 'order' => $slugs], 200);
+    }
+
+    private function get_field_group_order(): array
+    {
+        $order = get_option('enterprise_cpt_field_groups_order', []);
+
+        if (! is_array($order)) {
+            $order = [];
+        }
+
+        return $order;
+    }
+
+    private function set_field_group_order(array $slugs): void
+    {
+        update_option('enterprise_cpt_field_groups_order', array_map('sanitize_key', $slugs));
     }
 
     public function can_manage(): bool
     {
         return current_user_can('manage_options');
+    }
+
+    /**
+     * Get available location options for the field group editor
+     */
+    public function get_location_options(): WP_REST_Response
+    {
+        $postTypes = [];
+        $taxonomies = [];
+        $userRoles = [];
+
+        // Get registered post types
+        foreach (get_post_types(['public' => true], 'objects') as $postType) {
+            $postTypes[] = [
+                'value' => $postType->name,
+                'label' => $postType->label ?: ucfirst($postType->name),
+            ];
+        }
+
+        // Get registered taxonomies
+        foreach (get_taxonomies(['public' => true], 'objects') as $taxonomy) {
+            $taxonomies[] = [
+                'value' => $taxonomy->name,
+                'label' => $taxonomy->label ?: ucfirst($taxonomy->name),
+            ];
+        }
+
+        // Get available user roles
+        $wpRoles = wp_roles();
+        if ($wpRoles) {
+            foreach ($wpRoles->get_names() as $roleKey => $roleName) {
+                $userRoles[] = [
+                    'value' => $roleKey,
+                    'label' => $roleName,
+                ];
+            }
+        }
+
+        return new WP_REST_Response([
+            'post_types' => $postTypes,
+            'taxonomies' => $taxonomies,
+            'user_roles' => $userRoles,
+        ]);
     }
 
     /**
@@ -217,13 +356,36 @@ final class FieldGroupController
     public function get_groups_for_post_type(WP_REST_Request $request): WP_REST_Response
     {
         $postType = sanitize_key((string) $request->get_param('post_type'));
+        $userId = get_current_user_id();
 
         $groups = array_values(array_filter(
             $this->fieldGroups->definitionList(),
             static fn (array $g): bool => sanitize_key((string) ($g['post_type'] ?? '')) === $postType
         ));
 
-        return new WP_REST_Response($groups, 200);
+        $visible = [];
+
+        foreach ($groups as $group) {
+            $slug = sanitize_key((string) ($group['name'] ?? ''));
+
+            if ($slug === '') {
+                continue;
+            }
+
+            $accessLevel = $this->permissionResolver->get_user_access_level($slug, $userId);
+
+            if ($accessLevel === PermissionResolver::ACCESS_NONE) {
+                continue;
+            }
+
+            if ($accessLevel === PermissionResolver::ACCESS_READ_ONLY) {
+                $group['readonly'] = true;
+            }
+
+            $visible[] = $group;
+        }
+
+        return new WP_REST_Response($visible, 200);
     }
 
     public function search_items(WP_REST_Request $request): WP_REST_Response|WP_Error
