@@ -1,0 +1,47 @@
+{
+    "version": 1,
+    "generated_at": "2026-04-05T11:50:01+00:00",
+    "global": [],
+    "index": {
+        "post_type": {
+            "product": [
+                "product_fields"
+            ],
+            "post": [
+                "sales_field_group",
+                "shipping"
+            ]
+        },
+        "taxonomy": [],
+        "user_role": []
+    },
+    "groups": {
+        "product_fields": [
+            [
+                {
+                    "param": "post_type",
+                    "operator": "==",
+                    "value": "product"
+                }
+            ]
+        ],
+        "sales_field_group": [
+            [
+                {
+                    "param": "post_type",
+                    "operator": "==",
+                    "value": "post"
+                }
+            ]
+        ],
+        "shipping": [
+            [
+                {
+                    "param": "post_type",
+                    "operator": "==",
+                    "value": "post"
+                }
+            ]
+        ]
+    }
+}

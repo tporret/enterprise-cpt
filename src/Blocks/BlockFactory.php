@@ -33,13 +33,15 @@ final class BlockFactory
 
     private function registerBlock(array $group): void
     {
-        $slug = sanitize_key((string) ($group['name'] ?? ''));
+        $groupSlug = sanitize_key((string) ($group['name'] ?? ''));
+        $configuredBlockSlug = sanitize_key((string) ($group['block_slug'] ?? ''));
+        $blockSlug = $this->toBlockSlug($configuredBlockSlug !== '' ? $configuredBlockSlug : $groupSlug);
 
-        if ($slug === '') {
+        if ($groupSlug === '' || $blockSlug === '') {
             return;
         }
 
-        $blockName = 'enterprise-cpt/' . $slug;
+        $blockName = 'enterprise-cpt/' . $blockSlug;
 
         $icon = (string) ($group['block_icon'] ?? '');
         $category = (string) ($group['block_category'] ?? 'enterprise-cpt');
@@ -53,7 +55,7 @@ final class BlockFactory
             ],
             'fieldGroupSlug' => [
                 'type'    => 'string',
-                'default' => $slug,
+                'default' => $groupSlug,
             ],
         ];
 
@@ -76,10 +78,10 @@ final class BlockFactory
 
         register_block_type($blockName, [
             'api_version'     => 3,
-            'title'           => (string) ($group['title'] ?? ucwords(str_replace('_', ' ', $slug))),
+            'title'           => (string) ($group['title'] ?? ucwords(str_replace('_', ' ', $groupSlug))),
             'category'        => $category !== '' ? $category : 'enterprise-cpt',
             'icon'            => $icon !== '' ? $icon : 'screenoptions',
-            'description'     => $description !== '' ? $description : sprintf('Enterprise CPT block for the "%s" field group.', $group['title'] ?? $slug),
+            'description'     => $description !== '' ? $description : sprintf('Enterprise CPT block for the "%s" field group.', $group['title'] ?? $groupSlug),
             'supports'        => [
                 'html'     => false,
                 'align'    => true,
@@ -100,5 +102,14 @@ final class BlockFactory
             'repeater'        => 'array',
             default           => 'string',
         };
+    }
+
+    private function toBlockSlug(string $slug): string
+    {
+        $slug = str_replace('_', '-', $slug);
+        $slug = preg_replace('/[^a-z0-9-]/', '-', $slug) ?? '';
+        $slug = preg_replace('/-+/', '-', $slug) ?? '';
+
+        return trim($slug, '-');
     }
 }

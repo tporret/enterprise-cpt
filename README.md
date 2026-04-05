@@ -202,6 +202,12 @@ Field groups can be exposed as native Gutenberg blocks by adding `"is_block": tr
 
 8. **Block Instance ID** — Each block instance gets a UUID (`blockInstanceId` attribute) on first render, so multiple blocks of the same type on one page each have an isolated row in the custom table.
 
+9. **FSE-Smart Preview Strategy** — The block preview pipeline is context-aware so it behaves well in both Post Editor and Site Editor:
+  - **Post Editor**: lower-latency SSR preview updates for fast content iteration
+  - **Site Editor (`wp_template`, `wp_template_part`)**: throttled SSR, manual **Refresh Preview** control, and paused fetch while actively editing modal fields
+
+10. **Preview Cache + Graceful Degradation** — SSR responses are cached per `block_slug + attributes` to reduce duplicate requests. If SSR preview fails in Site Editor, the UI falls back to a compact field-summary view instead of triggering a hard block preview crash.
+
 ### Why This Feature Exists
 
 The resolver/scaffolder design was introduced to make block rendering production-safe and editor-friendly in real environments:
@@ -210,6 +216,12 @@ The resolver/scaffolder design was introduced to make block rendering production
 - **Zero-config first render**: plugin fallback prevents broken previews
 - **Progressive customization**: users can start with scaffolded templates, then promote to theme templates
 - **Read-only resilience**: if writes fail, blocks still render and users get explicit warnings
+
+The FSE-smart preview extension was added for editor performance and reliability at scale:
+
+- **Site Editor safety**: templates and template parts often contain many dynamic blocks; throttling and manual refresh reduce preview storming
+- **Operational stability**: temporary SSR errors in Site Editor degrade to summary preview instead of hard failure UI
+- **Lower server overhead**: request deduplication via preview cache avoids redundant render calls on unchanged data
 
 ### Enabling a Block
 
@@ -252,6 +264,23 @@ $fields = (array) $fields;
   <p><?php echo esc_html( $fields['description'] ?? '' ); ?></p>
 </section>
 ```
+
+### Editor Context Behavior (Post Editor vs Site Editor)
+
+- Context detection uses Gutenberg stores (`core/editor` and `core/edit-site`) and post type checks.
+- Site Editor behavior applies when editing `wp_template` or `wp_template_part`.
+- In Site Editor mode:
+  - debounce window is longer
+  - live preview pauses while editing modal fields
+  - a **Refresh Preview** action is available
+  - fallback summary UI is used when SSR preview errors occur
+
+### Known Limitations
+
+- Preview cache is in-memory per browser tab/session and is not shared across users or devices.
+- In Site Editor, preview updates are intentionally throttled; use **Refresh Preview** for immediate SSR re-render.
+- If render templates depend on external runtime state (custom globals, non-deterministic queries), cached preview HTML may lag until refresh.
+- Filesystem read-only environments rely on DB buffer fallback for definitions/templates; writes may be skipped with warnings.
 
 ## Development Notes
 

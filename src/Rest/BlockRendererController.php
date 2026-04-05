@@ -64,7 +64,11 @@ final class BlockRendererController
         $group = null;
 
         foreach ($this->fieldGroups->definitionList() as $def) {
-            if (sanitize_key((string) ($def['name'] ?? '')) === $blockName) {
+            $groupSlug = sanitize_key((string) ($def['name'] ?? ''));
+            $configuredBlockSlug = sanitize_key((string) ($def['block_slug'] ?? ''));
+            $blockSlug = $this->toBlockSlug($configuredBlockSlug !== '' ? $configuredBlockSlug : $groupSlug);
+
+            if ($groupSlug === $blockName || $blockSlug === $blockName) {
                 $group = $def;
                 break;
             }
@@ -83,5 +87,14 @@ final class BlockRendererController
         $html = Resolver::render_block($group, $attributes);
 
         return new WP_REST_Response(['html' => $html], 200);
+    }
+
+    private function toBlockSlug(string $slug): string
+    {
+        $slug = str_replace('_', '-', $slug);
+        $slug = preg_replace('/[^a-z0-9-]/', '-', $slug) ?? '';
+        $slug = preg_replace('/-+/', '-', $slug) ?? '';
+
+        return trim($slug, '-');
     }
 }

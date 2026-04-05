@@ -89,7 +89,10 @@ final class CPT
         $buffer[$normalizedSlug] = $definition;
 
         update_option($this->bufferOptionName, $buffer, false);
-        error_log(sprintf('Enterprise CPT warning: definition "%s" saved to DB buffer because %s is read-only.', $normalizedSlug, $this->storagePath));
+
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log(sprintf('Enterprise CPT info: definition "%s" saved to DB buffer because %s is read-only.', $normalizedSlug, $this->storagePath));
+        }
 
         $this->flushCaches();
     }

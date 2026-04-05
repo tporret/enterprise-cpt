@@ -21,6 +21,7 @@ import {
 import { useEffect, useState } from '@wordpress/element';
 import { useBlockProps, BlockControls } from '@wordpress/block-editor';
 import { ToolbarGroup, ToolbarButton } from '@wordpress/components';
+import { useSelect } from '@wordpress/data';
 import { pencil } from '@wordpress/icons';
 import { v4 as uuidv4 } from './uuid';
 import LivePreview from './components/LivePreview';
@@ -42,7 +43,26 @@ function normalizeChoices(choices) {
 }
 
 function getFieldGroup(slug) {
-    return (config.fieldGroups || []).find((g) => g.name === slug) || null;
+    const normalized = String(slug || '')
+        .toLowerCase()
+        .replace(/_/g, '-')
+        .replace(/[^a-z0-9-]/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '');
+
+    return (
+        (config.fieldGroups || []).find((g) => {
+            const groupName = String(g.name || '');
+            const groupBlockSlug = groupName
+                .toLowerCase()
+                .replace(/_/g, '-')
+                .replace(/[^a-z0-9-]/g, '-')
+                .replace(/-+/g, '-')
+                .replace(/^-|-$/g, '');
+
+            return groupName === slug || groupBlockSlug === normalized;
+        }) || null
+    );
 }
 
 // ── SubfieldRenderer ─────────────────────────────────────────────────────────
@@ -190,10 +210,24 @@ function SubfieldRenderer({ field, value, onChange }) {
 export default function Edit({ name, attributes, setAttributes }) {
     const blockProps = useBlockProps();
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const postType = useSelect((select) => {
+        const editorStore = select('core/editor');
+
+        return editorStore?.getCurrentPostType?.() || '';
+    }, []);
+    const hasEditSiteStore = useSelect((select) => {
+        try {
+            return Boolean(select('core/edit-site'));
+        } catch (e) {
+            return false;
+        }
+    }, []);
+    const isSiteEditor = hasEditSiteStore || postType === 'wp_template' || postType === 'wp_template_part';
 
     // Derive the field group slug from the block name: "enterprise-cpt/my-group" → "my-group"
-    const slug = name.replace(/^enterprise-cpt\//, '');
-    const group = getFieldGroup(slug);
+    const slugFromName = name.replace(/^enterprise-cpt\//, '');
+    const fieldGroupSlug = attributes.fieldGroupSlug || slugFromName;
+    const group = getFieldGroup(fieldGroupSlug);
     const groupIcon = group?.block_icon || 'screenoptions';
 
     // Assign a unique block instance ID on first render if not set.
@@ -207,7 +241,7 @@ export default function Edit({ name, attributes, setAttributes }) {
         return (
             <div {...blockProps}>
                 <Placeholder icon="screenoptions" label="Enterprise CPT Block">
-                    <p>Field group "{slug}" not found.</p>
+                    <p>Field group "{fieldGroupSlug}" not found.</p>
                 </Placeholder>
             </div>
         );
@@ -253,7 +287,7 @@ export default function Edit({ name, attributes, setAttributes }) {
             {!hasData && !isModalOpen && (
                 <Placeholder
                     icon={groupIcon}
-                    label={group.title || slug}
+                    label={group.title || fieldGroupSlug}
                     instructions={group.block_description || 'Click "Edit Data" to configure this block.'}
                 >
                     <Button variant="primary" onClick={() => setIsModalOpen(true)}>
@@ -284,7 +318,7 @@ export default function Edit({ name, attributes, setAttributes }) {
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <span className={`dashicons dashicons-${groupIcon}`} style={{ fontSize: 20, width: 20, height: 20, color: 'var(--wp-admin-theme-color, #007cba)' }} />
                                 <strong style={{ fontSize: 14 }}>
-                                    {group.title || slug}
+                                    {group.title || fieldGroupSlug}
                                 </strong>
                             </div>
                             <Button variant="primary" isSmall onClick={() => setIsModalOpen(true)}>
@@ -292,7 +326,13 @@ export default function Edit({ name, attributes, setAttributes }) {
                             </Button>
                         </div>
 
-                        <LivePreview blockName={slug} attributes={attributes} />
+                        <LivePreview
+                            blockName={slugFromName}
+                            attributes={attributes}
+                            isSiteEditor={isSiteEditor}
+                            isEditing={isModalOpen}
+                            fallbackSummary={summaryItems}
+                        />
                     </CardBody>
                 </div>
             )}
@@ -300,7 +340,7 @@ export default function Edit({ name, attributes, setAttributes }) {
             {/* Focus Canvas Modal */}
             {isModalOpen && (
                 <Modal
-                    title={`Editing ${group.title || slug}`}
+                    title={`Editing ${group.title || fieldGroupSlug}`}
                     onRequestClose={() => setIsModalOpen(false)}
                 >
                     <div style={{ minWidth: 480 }}>

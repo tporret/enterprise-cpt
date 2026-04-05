@@ -170,6 +170,30 @@ final class FieldGroupController
             'isWritable' => ! $this->fieldGroups->is_readonly_env(),
         ];
 
+        $savedItem = $response['item'];
+
+        if (is_array($savedItem) && ! empty($savedItem['is_block'])) {
+            $groupSlug = sanitize_key((string) ($savedItem['name'] ?? $slug));
+            $blockSlug = sanitize_key((string) ($savedItem['block_slug'] ?? ''));
+
+            if ($blockSlug === '') {
+                $blockSlug = str_replace('_', '-', $groupSlug);
+                $blockSlug = preg_replace('/[^a-z0-9-]/', '-', $blockSlug) ?? '';
+                $blockSlug = preg_replace('/-+/', '-', $blockSlug) ?? '';
+                $blockSlug = trim($blockSlug, '-');
+            }
+
+            $response['block_slug'] = $blockSlug;
+
+            if ($groupSlug !== '' && $blockSlug !== '' && $groupSlug !== $blockSlug) {
+                $response['block_slug_warning'] = sprintf(
+                    'Block slug normalized from "%s" to "%s" for Gutenberg registration.',
+                    $groupSlug,
+                    $blockSlug
+                );
+            }
+        }
+
         // Surface any scaffold warnings from the save action.
         $scaffoldWarning = get_transient('enterprise_cpt_scaffold_warning_' . $slug);
 

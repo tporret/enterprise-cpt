@@ -66,7 +66,10 @@ final class FieldGroups
         $buffer[$normalizedSlug] = $definition;
 
         update_option($this->bufferOptionName, $buffer, false);
-        error_log(sprintf('Enterprise CPT warning: field group "%s" saved to DB buffer because %s is read-only.', $normalizedSlug, $this->storagePath));
+
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log(sprintf('Enterprise CPT info: field group "%s" saved to DB buffer because %s is read-only.', $normalizedSlug, $this->storagePath));
+        }
 
         $this->flushCaches();
         do_action('enterprise_cpt/field_group_saved', $normalizedSlug, $definition);
@@ -198,6 +201,9 @@ final class FieldGroups
         $definition['block_icon'] = sanitize_text_field((string) ($definition['block_icon'] ?? ''));
         $definition['block_category'] = sanitize_key((string) ($definition['block_category'] ?? 'enterprise-cpt'));
         $definition['block_description'] = sanitize_text_field((string) ($definition['block_description'] ?? ''));
+        $definition['block_slug'] = $definition['is_block']
+            ? $this->normalizeBlockSlug((string) ($definition['block_slug'] ?? $slug), $slug)
+            : '';
         $definition['location_rules'] = $this->normalizeLocationRules($definition['location_rules'] ?? []);
         $definition['fields'] = $this->normalizeFields($definition['fields'] ?? []);
 
@@ -206,6 +212,21 @@ final class FieldGroups
         }
 
         return $definition;
+    }
+
+    private function normalizeBlockSlug(string $candidate, string $fallback): string
+    {
+        $slug = sanitize_key($candidate);
+
+        if ($slug === '') {
+            $slug = sanitize_key($fallback);
+        }
+
+        $slug = str_replace('_', '-', $slug);
+        $slug = preg_replace('/[^a-z0-9-]/', '-', $slug) ?? '';
+        $slug = preg_replace('/-+/', '-', $slug) ?? '';
+
+        return trim($slug, '-');
     }
 
     private function normalizeLocationRules(mixed $rules): array

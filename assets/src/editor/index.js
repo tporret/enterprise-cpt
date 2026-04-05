@@ -414,7 +414,7 @@ function App() {
         setError('');
 
         try {
-            await apiFetch({
+            const response = await apiFetch({
                 path: `${config.restBase}/field-groups/save`,
                 method: 'POST',
                 data: {
@@ -423,9 +423,26 @@ function App() {
                 },
             });
 
-            setActiveGroup((prev) => ({ ...prev, name: slug }));
-            setActiveGroupSlug(slug);
+            const saved = response?.item || null;
+            const savedSlug = saved?.name || slug;
+
+            if (saved) {
+                setActiveGroup(saved);
+            } else {
+                setActiveGroup((prev) => ({ ...prev, name: savedSlug }));
+            }
+
+            setActiveGroupSlug(savedSlug);
             showSnack('success', `Saved ${slug}.`);
+
+            if (response?.block_slug_warning) {
+                showSnack('warning', response.block_slug_warning);
+            }
+
+            if (response?.scaffold_warning) {
+                showSnack('warning', response.scaffold_warning);
+            }
+
             await fetchList();
         } catch (apiError) {
             const message = apiError?.message || 'Save failed.';

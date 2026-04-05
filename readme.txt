@@ -55,6 +55,13 @@ You can:
 - Blocks appear in the **Enterprise CPT** block category in the inserter
 - Universal Edit component shows a canvas summary view and opens a Focus Canvas modal for editing
 - Live preview in the editor is server-rendered and uses the same template resolution path as frontend output
+- Works in FSE-capable themes (Site Editor templates, template parts, and patterns)
+- Smart preview mode adapts by editor context:
+	1. Post Editor: fast live SSR updates
+	2. Site Editor: lower-frequency SSR updates with manual **Refresh Preview** control
+- Site Editor editing pauses preview fetch while typing in the Focus Canvas modal to reduce server load
+- If SSR preview fails in Site Editor, the block shows a non-breaking field summary fallback instead of a hard block error
+- Preview responses are cached per block+attributes to avoid repeated server calls for unchanged content
 - Enterprise Template Resolver checks templates in this order:
 	1. Active Theme: `{theme}/enterprise-cpt/blocks/{slug}.php`
 	2. Persistent Storage: `wp-content/uploads/enterprise-cpt/templates/{slug}.php`
@@ -72,6 +79,11 @@ You can:
 3. Customize output by creating a theme template at:
 	 - `wp-content/themes/your-theme/enterprise-cpt/blocks/{slug}.php`
 4. If no theme template exists, Enterprise CPT uses uploads scaffold (if available), then plugin fallback.
+
+For Site Editor users:
+
+- Use **Refresh Preview** after larger edits when working in templates/template parts.
+- If live SSR is temporarily unavailable, the block shows a summary fallback and remains editable.
 
 Template variables:
 
@@ -143,6 +155,15 @@ Definition saves are buffered into WordPress options when files are not writable
 No. Shadow sync and compatibility paths are included to support standard WordPress metadata access patterns.
 
 == Changelog ==
+
+= 0.4.0 =
+
+- FSE-ready smart preview mode for Enterprise CPT blocks in Site Editor (templates/template parts/patterns)
+- Context-aware preview strategy: fast SSR in Post Editor, throttled SSR + manual refresh in Site Editor
+- Automatic preview pause while editing in Focus Canvas modal to reduce SSR churn
+- In-memory preview cache keyed by block+attributes for fewer duplicate render requests
+- Graceful Site Editor fallback summary when SSR preview errors occur (no hard block crash)
+- Save-time block slug normalization messaging in Field Group editor responses (`block_slug_warning`)
 
 = 0.2.0 =
 

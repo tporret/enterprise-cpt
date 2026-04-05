@@ -11,16 +11,30 @@ import Edit from './edit';
 
 const config = window.enterpriseCptEditor || { fieldGroups: [] };
 
+function toBlockSlug(name) {
+    return String(name || '')
+        .trim()
+        .toLowerCase()
+        .replace(/_/g, '-')
+        .replace(/[^a-z0-9-]/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '');
+}
+
 (config.fieldGroups || []).forEach((group) => {
     if (!group.is_block) return;
 
-    const slug = group.name;
-    const blockName = `enterprise-cpt/${slug}`;
+    const groupSlug = group.name;
+    const blockSlug = toBlockSlug(group.block_slug || groupSlug);
+
+    if (!blockSlug) return;
+
+    const blockName = `enterprise-cpt/${blockSlug}`;
 
     // Build the attributes map from the field schema.
     const attributes = {
         blockInstanceId: { type: 'string', default: '' },
-        fieldGroupSlug: { type: 'string', default: slug },
+        fieldGroupSlug: { type: 'string', default: groupSlug },
     };
 
     (group.fields || []).forEach((field) => {
@@ -48,10 +62,10 @@ const config = window.enterpriseCptEditor || { fieldGroups: [] };
     });
 
     registerBlockType(blockName, {
-        title: group.title || slug,
+        title: group.title || groupSlug,
         category: group.block_category || 'enterprise-cpt',
         icon: group.block_icon || 'screenoptions',
-        description: group.block_description || `Enterprise CPT block for the "${group.title || slug}" field group.`,
+        description: group.block_description || `Enterprise CPT block for the "${group.title || groupSlug}" field group.`,
         supports: { html: false, align: true, multiple: true },
         attributes,
         edit: Edit,

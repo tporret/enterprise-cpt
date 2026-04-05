@@ -840,7 +840,18 @@ final class Plugin
         $groupsBySlug = [];
 
         foreach ($blockGroups as $g) {
-            $groupsBySlug[$g['name']] = $g;
+            $groupSlug = sanitize_key((string) ($g['name'] ?? ''));
+            $configuredBlockSlug = sanitize_key((string) ($g['block_slug'] ?? ''));
+
+            if ($groupSlug === '') {
+                continue;
+            }
+
+            $groupsBySlug[$groupSlug] = $g;
+            if ($configuredBlockSlug !== '') {
+                $groupsBySlug[$configuredBlockSlug] = $g;
+            }
+            $groupsBySlug[$this->toBlockSlug($groupSlug)] = $g;
         }
 
         foreach ($blocks as $block) {
@@ -928,5 +939,15 @@ final class Plugin
                 ...array_values($columns)
             )
         );
+    }
+
+    private function toBlockSlug(string $slug): string
+    {
+        $slug = sanitize_key($slug);
+        $slug = str_replace('_', '-', $slug);
+        $slug = preg_replace('/[^a-z0-9-]/', '-', $slug) ?? '';
+        $slug = preg_replace('/-+/', '-', $slug) ?? '';
+
+        return trim($slug, '-');
     }
 }

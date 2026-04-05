@@ -1,0 +1,37 @@
+{
+    "type": "field_group",
+    "name": "sales_field_group",
+    "title": "Sales",
+    "post_type": "post",
+    "location_rules": [
+        {
+            "param": "post_type",
+            "operator": "==",
+            "value": "post"
+        }
+    ],
+    "custom_table_name": "",
+    "is_block": true,
+    "block_icon": "admin-post",
+    "block_category": "enterprise-cpt",
+    "block_description": "This to show sale numbers",
+    "fields": [
+        {
+            "type": "text",
+            "name": "enterprise_cpt_field_1",
+            "label": "Field 1",
+            "help": "",
+            "show_in_rest": true,
+            "single": true,
+            "default": "",
+            "min": "",
+            "max": "",
+            "step": "",
+            "on_text": "On",
+            "off_text": "Off",
+            "choices": [],
+            "rows": []
+        }
+    ],
+    "block_slug": "sales-field-group"
+}

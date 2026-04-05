@@ -176,7 +176,10 @@ final class Compiler
         if ($this->isReadonlyPath($this->registryPath)) {
             update_option($this->bufferOptionName, $registry, false);
             update_option($this->signatureOptionName, $this->definitionsSignature(), false);
-            error_log(sprintf('Enterprise CPT warning: location registry saved to DB buffer because %s is read-only.', $this->registryPath));
+
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log(sprintf('Enterprise CPT info: location registry saved to DB buffer because %s is read-only.', $this->registryPath));
+            }
 
             return;
         }

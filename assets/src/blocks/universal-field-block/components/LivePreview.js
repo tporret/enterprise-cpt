@@ -6,18 +6,38 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from '@wordpress/element';
-import { Spinner } from '@wordpress/components';
+import { Button, Spinner } from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
 import { addQueryArgs } from '@wordpress/url';
 
-export default function LivePreview({ blockName, attributes }) {
+const previewCache = new Map();
+
+export default function LivePreview({
+    blockName,
+    attributes,
+    isSiteEditor = false,
+    isEditing = false,
+    fallbackSummary = [],
+}) {
     const [html, setHtml] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [refreshTick, setRefreshTick] = useState(0);
     const timerRef = useRef(null);
     const controllerRef = useRef(null);
+    const attributesKey = JSON.stringify(attributes || {});
+    const cacheKey = `${blockName}::${attributesKey}`;
+    const debounceMs = isSiteEditor ? 1200 : 500;
 
-    const fetchPreview = useCallback(() => {
+    const fetchPreview = useCallback((force = false) => {
+        if (!force && previewCache.has(cacheKey)) {
+            setHtml(previewCache.get(cacheKey) || '');
+            setError(null);
+            setIsLoading(false);
+
+            return;
+        }
+
         // Abort any in-flight request.
         if (controllerRef.current) {
             controllerRef.current.abort();
@@ -32,7 +52,7 @@ export default function LivePreview({ blockName, attributes }) {
 
         const path = addQueryArgs('/enterprise-cpt/v1/render-block', {
             block_name: blockName,
-            attributes: JSON.stringify(attributes),
+            attributes: attributesKey,
         });
 
         apiFetch({ path, signal: abortController?.signal })
@@ -41,7 +61,9 @@ export default function LivePreview({ blockName, attributes }) {
                     setError(response.error);
                     setHtml('');
                 } else {
-                    setHtml(response.html || '');
+                    const nextHtml = response.html || '';
+                    previewCache.set(cacheKey, nextHtml);
+                    setHtml(nextHtml);
                     setError(null);
                 }
             })
@@ -57,15 +79,25 @@ export default function LivePreview({ blockName, attributes }) {
             .finally(() => {
                 setIsLoading(false);
             });
-    }, [blockName, JSON.stringify(attributes)]);
+    }, [attributesKey, blockName, cacheKey]);
 
-    // Debounce the fetch by 500ms after attributes change.
+    // Debounce SSR requests. Site Editor uses a longer delay and pauses while editing.
     useEffect(() => {
+        if (isSiteEditor && isEditing) {
+            setIsLoading(false);
+
+            return () => {
+                if (controllerRef.current) {
+                    controllerRef.current.abort();
+                }
+            };
+        }
+
         if (timerRef.current) {
             clearTimeout(timerRef.current);
         }
 
-        timerRef.current = setTimeout(fetchPreview, 500);
+        timerRef.current = setTimeout(() => fetchPreview(false), debounceMs);
 
         return () => {
             clearTimeout(timerRef.current);
@@ -73,7 +105,45 @@ export default function LivePreview({ blockName, attributes }) {
                 controllerRef.current.abort();
             }
         };
-    }, [fetchPreview]);
+    }, [debounceMs, fetchPreview, isEditing, isSiteEditor, refreshTick]);
+
+    const refreshPreview = () => {
+        previewCache.delete(cacheKey);
+        setRefreshTick((v) => v + 1);
+    };
+
+    if (error && isSiteEditor) {
+        return (
+            <div
+                className="enterprise-cpt-live-preview enterprise-cpt-live-preview--fallback"
+                style={{
+                    border: '1px solid #dcdcde',
+                    borderRadius: 2,
+                    background: '#fff',
+                    padding: 12,
+                }}
+            >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                    <strong style={{ fontSize: 13 }}>Site Editor fallback preview</strong>
+                    <Button variant="secondary" isSmall onClick={refreshPreview}>
+                        Refresh Preview
+                    </Button>
+                </div>
+                <p style={{ marginTop: 8, marginBottom: 10, fontSize: 12, color: '#50575e' }}>
+                    Live SSR preview is temporarily unavailable while editing. Showing field summary.
+                </p>
+                {fallbackSummary.length > 0 ? (
+                    <ul style={{ margin: 0, paddingLeft: 16, fontSize: 13, color: '#1e1e1e' }}>
+                        {fallbackSummary.map((item, i) => (
+                            <li key={i}>{item}</li>
+                        ))}
+                    </ul>
+                ) : (
+                    <p style={{ margin: 0, fontSize: 13, color: '#1e1e1e' }}>No field values entered yet.</p>
+                )}
+            </div>
+        );
+    }
 
     if (isLoading) {
         return (
@@ -112,9 +182,18 @@ export default function LivePreview({ blockName, attributes }) {
     }
 
     return (
-        <div
-            className="enterprise-cpt-live-preview"
-            dangerouslySetInnerHTML={{ __html: html }}
-        />
+        <div className="enterprise-cpt-live-preview-wrap">
+            {isSiteEditor && (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+                    <Button variant="secondary" isSmall onClick={refreshPreview}>
+                        Refresh Preview
+                    </Button>
+                </div>
+            )}
+            <div
+                className="enterprise-cpt-live-preview"
+                dangerouslySetInnerHTML={{ __html: html }}
+            />
+        </div>
     );
 }
