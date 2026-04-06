@@ -1,5 +1,6 @@
 === Enterprise CPT ===
 Contributors: tporret
+Donate link: https://porretto.com/donate/
 Tags: custom post type, custom fields, gutenberg, metadata, performance
 Requires at least: 6.0
 Tested up to: 6.9
