@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace EnterpriseCPT\Storage;
 
 /**
- * PHP 8.1 backed enum representing the supported field types.
+ * PHP 8.3 backed enum representing the supported field types.
  *
  * Provides the canonical SQL column definition, wpdb format placeholder,
  * and empty default value for every type so no map arrays need to be

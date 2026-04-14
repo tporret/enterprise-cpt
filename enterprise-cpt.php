@@ -3,7 +3,7 @@
  * Plugin Name: Enterprise CPT
  * Description: JSON-first custom post types and field registration for enterprise WordPress data models.
  * Version: 0.1.0
- * Requires PHP: 8.1
+ * Requires PHP: 8.3
  * Tested up to: 6.9
  * Author: tporret
  * Text Domain: enterprise-cpt
@@ -37,17 +37,17 @@ final class EnterpriseCPT_Bootstrap
 }
 
 /**
- * Check plugin requirements before loading: PHP 8.1+, CREATE/ALTER permissions.
+ * Check plugin requirements before loading: PHP 8.3+, CREATE/ALTER permissions.
  *
  * @return array{ok: bool, error: string}
  */
 function enterprise_cpt_check_requirements(): array
 {
-    if (version_compare(PHP_VERSION, '8.1', '<')) {
+    if (version_compare(PHP_VERSION, '8.3', '<')) {
         return [
             'ok'    => false,
             'error' => sprintf(
-                'Enterprise CPT requires PHP 8.1 or later. Your server is running PHP %s.',
+                'Enterprise CPT requires PHP 8.3 or later. Your server is running PHP %s.',
                 PHP_VERSION
             ),
         ];

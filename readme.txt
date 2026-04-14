@@ -4,7 +4,7 @@ Donate link: https://porretto.com/donate/
 Tags: custom post type, custom fields, gutenberg, metadata, performance
 Requires at least: 6.0
 Tested up to: 6.9
-Requires PHP: 8.1
+Requires PHP: 8.3
 Stable tag: 0.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -136,7 +136,7 @@ Current field group endpoints:
 
 = Safety + Environment Checks =
 
-- PHP 8.1+ requirement check
+- PHP 8.3+ requirement check
 - CREATE/ALTER database permission checks
 - Activation-time folder hardening for upload definitions directory
 

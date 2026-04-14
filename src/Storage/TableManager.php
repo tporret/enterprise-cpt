@@ -11,7 +11,7 @@ namespace EnterpriseCPT\Storage;
  * whenever field group definitions change. Uses the FieldType enum for all
  * column type/format/default resolution.
  *
- * PHP 8.1+ readonly constructor properties are used so the prefix is guaranteed
+ * PHP 8.3+ readonly constructor properties are used so the prefix is guaranteed
  * immutable after construction.
  */
 final class TableManager
