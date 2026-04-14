@@ -213,7 +213,12 @@ final class FieldGroups
         $definition['block_slug'] = $definition['is_block']
             ? $this->normalizeBlockSlug((string) ($definition['block_slug'] ?? $slug), $slug)
             : '';
-        $definition['location_rules'] = $this->normalizeLocationRules($definition['location_rules'] ?? []);
+        $definition['location_rules'] = $this->normalizeDefinitionLocationRules($definition);
+        $definition['locations'] = $this->normalizeLocations(
+            $definition['locations'] ?? [],
+            $definition['location_rules'],
+            $definition['post_type']
+        );
         $definition['fields'] = $this->normalizeFields($definition['fields'] ?? []);
 
         if ($filePath !== null) {
@@ -221,6 +226,35 @@ final class FieldGroups
         }
 
         return $definition;
+    }
+
+    private function normalizeDefinitionLocationRules(array $definition): array
+    {
+        $legacyLocations = $this->normalizeLocations($definition['locations'] ?? [], [], sanitize_key((string) ($definition['post_type'] ?? '')));
+
+        if ($legacyLocations !== []) {
+            return $this->locationsToRuleGroups($legacyLocations);
+        }
+
+        $normalizedRules = $this->normalizeLocationRules($definition['location_rules'] ?? []);
+
+        if ($normalizedRules !== []) {
+            return $normalizedRules;
+        }
+
+        $postType = sanitize_key((string) ($definition['post_type'] ?? ''));
+
+        if ($postType === '') {
+            return [];
+        }
+
+        return [[
+            'rules' => [[
+                'param' => 'post_type',
+                'operator' => '==',
+                'value' => $postType,
+            ]],
+        ]];
     }
 
     private function normalizeBlockSlug(string $candidate, string $fallback): string
@@ -263,6 +297,39 @@ final class FieldGroups
             return [];
         }
 
+        $firstRule = reset($rules);
+
+        if (is_array($firstRule) && array_key_exists('rules', $firstRule)) {
+            $normalizedGroups = [];
+
+            foreach ($rules as $group) {
+                if (! is_array($group)) {
+                    continue;
+                }
+
+                $groupRules = $this->normalizeFlatLocationRules($group['rules'] ?? []);
+
+                if ($groupRules === []) {
+                    continue;
+                }
+
+                $normalizedGroups[] = ['rules' => $groupRules];
+            }
+
+            return $normalizedGroups;
+        }
+
+        $flatRules = $this->normalizeFlatLocationRules($rules);
+
+        return $flatRules === [] ? [] : [['rules' => $flatRules]];
+    }
+
+    private function normalizeFlatLocationRules(mixed $rules): array
+    {
+        if (! is_array($rules)) {
+            return [];
+        }
+
         $normalizedRules = [];
 
         foreach ($rules as $rule) {
@@ -270,14 +337,178 @@ final class FieldGroups
                 continue;
             }
 
+            $param = sanitize_key((string) ($rule['param'] ?? 'post_type'));
+            $operator = (string) ($rule['operator'] ?? '==');
+            $value = $rule['value'] ?? '';
+
+            if (is_array($value)) {
+                foreach ($value as $item) {
+                    $normalizedValue = sanitize_key((string) $item);
+
+                    if ($normalizedValue === '') {
+                        continue;
+                    }
+
+                    $normalizedRules[] = [
+                        'param' => $param,
+                        'operator' => $operator,
+                        'value' => $normalizedValue,
+                    ];
+                }
+
+                continue;
+            }
+
+            $normalizedValue = sanitize_key((string) $value);
+
+            if ($normalizedValue === '') {
+                continue;
+            }
+
             $normalizedRules[] = [
-                'param' => sanitize_key((string) ($rule['param'] ?? 'post_type')),
-                'operator' => (string) ($rule['operator'] ?? '=='),
-                'value' => sanitize_key((string) ($rule['value'] ?? '')),
+                'param' => $param,
+                'operator' => $operator,
+                'value' => $normalizedValue,
             ];
         }
 
         return $normalizedRules;
+    }
+
+    private function normalizeLocations(mixed $locations, array $locationRules, string $legacyPostType): array
+    {
+        if (is_array($locations) && $locations !== []) {
+            $normalized = [];
+
+            foreach ($locations as $location) {
+                if (! is_array($location)) {
+                    continue;
+                }
+
+                $type = sanitize_key((string) ($location['type'] ?? 'post_type'));
+                $values = $location['values'] ?? [];
+
+                if (! is_array($values)) {
+                    $values = $values === '' ? [] : [$values];
+                }
+
+                $normalizedValues = array_values(array_filter(array_map(
+                    static fn (mixed $value): string => sanitize_key((string) $value),
+                    $values
+                )));
+
+                if ($type === '' || $normalizedValues === []) {
+                    continue;
+                }
+
+                $normalized[] = [
+                    'type' => $type,
+                    'values' => array_values(array_unique($normalizedValues)),
+                ];
+            }
+
+            if ($normalized !== []) {
+                return $normalized;
+            }
+        }
+
+        $derived = [];
+
+        foreach ($locationRules as $group) {
+            $rules = is_array($group['rules'] ?? null) ? $group['rules'] : [];
+
+            foreach ($rules as $rule) {
+                if (! is_array($rule)) {
+                    continue;
+                }
+
+                $param = sanitize_key((string) ($rule['param'] ?? ''));
+                $value = sanitize_key((string) ($rule['value'] ?? ''));
+
+                if ($param === '' || $value === '') {
+                    continue;
+                }
+
+                $derived[$param] = $derived[$param] ?? [];
+                $derived[$param][] = $value;
+            }
+        }
+
+        if ($derived !== []) {
+            $normalized = [];
+
+            foreach ($derived as $type => $values) {
+                $normalized[] = [
+                    'type' => $type,
+                    'values' => array_values(array_unique($values)),
+                ];
+            }
+
+            return $normalized;
+        }
+
+        if ($legacyPostType !== '') {
+            return [[
+                'type' => 'post_type',
+                'values' => [$legacyPostType],
+            ]];
+        }
+
+        return [];
+    }
+
+    private function locationsToRuleGroups(array $locations): array
+    {
+        if ($locations === []) {
+            return [];
+        }
+
+        $valueSets = [];
+
+        foreach ($locations as $location) {
+            $type = sanitize_key((string) ($location['type'] ?? ''));
+            $values = is_array($location['values'] ?? null) ? $location['values'] : [];
+            $values = array_values(array_filter(array_map(static fn (mixed $value): string => sanitize_key((string) $value), $values)));
+
+            if ($type === '' || $values === []) {
+                continue;
+            }
+
+            $rulesForType = [];
+
+            foreach ($values as $value) {
+                $rulesForType[] = [
+                    'param' => $type,
+                    'operator' => '==',
+                    'value' => $value,
+                ];
+            }
+
+            $valueSets[] = $rulesForType;
+        }
+
+        if ($valueSets === []) {
+            return [];
+        }
+
+        $combinations = [[]];
+
+        foreach ($valueSets as $rulesForType) {
+            $next = [];
+
+            foreach ($combinations as $prefix) {
+                foreach ($rulesForType as $rule) {
+                    $next[] = array_merge($prefix, [$rule]);
+                }
+            }
+
+            $combinations = $next;
+        }
+
+        return array_map(
+            static fn (array $rules): array => ['rules' => $rules],
+            $combinations
+        );
     }
 
     private function normalizeFields(mixed $fields): array
@@ -306,26 +537,7 @@ final class FieldGroups
                 $defaultValue = $defaultValue === '' ? '' : (string) $defaultValue;
             }
 
-            $choices = isset($field['choices']) && is_array($field['choices']) ? $field['choices'] : [];
-
-            $normalizedChoices = [];
-
-            foreach ($choices as $choice) {
-                if (! is_array($choice)) {
-                    continue;
-                }
-
-                $choiceValue = (string) ($choice['value'] ?? '');
-
-                if ($choiceValue === '') {
-                    continue;
-                }
-
-                $normalizedChoices[] = [
-                    'value' => $choiceValue,
-                    'label' => (string) ($choice['label'] ?? $choiceValue),
-                ];
-            }
+            $normalizedChoices = $this->normalizeChoices($field['choices'] ?? []);
 
             $normalizedFields[] = [
                 'type' => $fieldType,
@@ -346,6 +558,39 @@ final class FieldGroups
         }
 
         return $normalizedFields;
+    }
+
+    /**
+     * Normalize select/radio choices from modern array definitions.
+     *
+     * @return list<array{value: string, label: string}>
+     */
+    private function normalizeChoices(mixed $choices): array
+    {
+        if (! is_array($choices)) {
+            return [];
+        }
+
+        $normalizedChoices = [];
+
+        foreach ($choices as $choice) {
+            if (! is_array($choice)) {
+                continue;
+            }
+
+            $choiceValue = (string) ($choice['value'] ?? '');
+
+            if ($choiceValue === '') {
+                continue;
+            }
+
+            $normalizedChoices[] = [
+                'value' => $choiceValue,
+                'label' => (string) ($choice['label'] ?? $choiceValue),
+            ];
+        }
+
+        return $normalizedChoices;
     }
 
     /**

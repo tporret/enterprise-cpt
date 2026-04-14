@@ -135,7 +135,7 @@ final class FieldGroupController
             }
 
             $locationRules = is_array($definition['location_rules'] ?? null) ? $definition['location_rules'] : [];
-            $locationSummary = $this->locationSummary($locationRules);
+            $locationSummary = $this->locationSummary($definition);
             $hasCustomTable = (string) ($definition['custom_table_name'] ?? '') !== '';
 
             $items[] = [
@@ -514,8 +514,34 @@ final class FieldGroupController
         return str_contains($haystack, strtolower($query));
     }
 
-    private function locationSummary(array $rules): string
+    private function locationSummary(array $definition): string
     {
+        $locations = is_array($definition['locations'] ?? null) ? $definition['locations'] : [];
+
+        if ($locations !== []) {
+            $parts = [];
+
+            foreach ($locations as $location) {
+                if (! is_array($location)) {
+                    continue;
+                }
+
+                $type = (string) ($location['type'] ?? 'post_type');
+                $values = is_array($location['values'] ?? null) ? $location['values'] : [];
+                $values = array_values(array_filter(array_map(static fn (mixed $value): string => (string) $value, $values)));
+
+                if ($values === []) {
+                    continue;
+                }
+
+                $parts[] = trim($type . ' == ' . implode(', ', $values));
+            }
+
+            return $parts === [] ? 'No rules' : implode(' | ', $parts);
+        }
+
+        $rules = is_array($definition['location_rules'] ?? null) ? $definition['location_rules'] : [];
+
         if ($rules === []) {
             return 'No rules';
         }
@@ -523,6 +549,21 @@ final class FieldGroupController
         $parts = [];
 
         foreach ($rules as $rule) {
+            if (is_array($rule) && isset($rule['rules']) && is_array($rule['rules'])) {
+                foreach ($rule['rules'] as $nestedRule) {
+                    if (! is_array($nestedRule)) {
+                        continue;
+                    }
+
+                    $param = (string) ($nestedRule['param'] ?? 'post_type');
+                    $operator = (string) ($nestedRule['operator'] ?? '==');
+                    $value = (string) ($nestedRule['value'] ?? '');
+                    $parts[] = trim($param . ' ' . $operator . ' ' . $value);
+                }
+
+                continue;
+            }
+
             if (! is_array($rule)) {
                 continue;
             }

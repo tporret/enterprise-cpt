@@ -70,9 +70,11 @@ final class BlockFactory
                 continue;
             }
 
+            $fieldType = (string) ($field['type'] ?? 'text');
+
             $attributes[$fieldName] = [
-                'type'    => $this->fieldTypeToBlockAttribute((string) ($field['type'] ?? 'text')),
-                'default' => $field['default'] ?? '',
+                'type'    => $this->fieldTypeToBlockAttribute($fieldType),
+                'default' => $this->normalizeBlockAttributeDefault($fieldType, $field['default'] ?? null),
             ];
         }
 
@@ -102,6 +104,34 @@ final class BlockFactory
             'repeater'        => 'array',
             default           => 'string',
         };
+    }
+
+    private function normalizeBlockAttributeDefault(string $fieldType, mixed $default): mixed
+    {
+        return match ($fieldType) {
+            'number', 'image' => is_numeric($default) ? 0 + $default : 0,
+            'true_false' => (bool) $default,
+            'repeater' => $this->normalizeRepeaterDefault($default),
+            default => is_scalar($default) ? (string) $default : '',
+        };
+    }
+
+    /**
+     * @return array<int, mixed>
+     */
+    private function normalizeRepeaterDefault(mixed $default): array
+    {
+        if (is_array($default)) {
+            return $default;
+        }
+
+        if (! is_string($default) || $default === '') {
+            return [];
+        }
+
+        $decoded = json_decode($default, true);
+
+        return is_array($decoded) ? $decoded : [];
     }
 
     private function toBlockSlug(string $slug): string

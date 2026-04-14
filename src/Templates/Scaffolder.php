@@ -80,7 +80,6 @@ final class Scaffolder
     private function generateTemplate(string $slug, array $definition): string
     {
         $title  = (string) ($definition['title'] ?? ucwords(str_replace(['-', '_'], ' ', $slug)));
-        $fields = is_array($definition['fields'] ?? null) ? $definition['fields'] : [];
 
         $lines = [];
         $lines[] = '<?php';
@@ -103,68 +102,7 @@ final class Scaffolder
         $lines[] = '}';
         $lines[] = '';
         $lines[] = '$fields = (array) $fields;';
-        $lines[] = '?>';
-        $lines[] = '<div class="enterprise-cpt-block enterprise-cpt-block--' . esc_attr($slug) . '">';
-        $lines[] = '    <h2>' . esc_html($title) . '</h2>';
-        $lines[] = '';
-
-        foreach ($fields as $field) {
-            if (! is_array($field)) {
-                continue;
-            }
-
-            $name  = (string) ($field['name'] ?? '');
-            $label = (string) ($field['label'] ?? $name);
-            $type  = (string) ($field['type'] ?? 'text');
-
-            if ($name === '' || str_starts_with($name, '_')) {
-                continue;
-            }
-
-            $varName = '$' . preg_replace('/[^a-z0-9_]/', '_', $name);
-
-            $lines[] = '    <?php ' . $varName . ' = $fields[\'' . addslashes($name) . '\'] ?? \'\'; ?>';
-
-            switch ($type) {
-                case 'image':
-                    $lines[] = '    <?php if ( (int) ' . $varName . ' > 0 ) : ?>';
-                    $lines[] = '        <div class="enterprise-cpt-block__field">';
-                    $lines[] = '            <strong>' . esc_html($label) . ':</strong>';
-                    $lines[] = '            <?php echo wp_get_attachment_image( (int) ' . $varName . ', \'medium\' ); ?>';
-                    $lines[] = '        </div>';
-                    $lines[] = '    <?php endif; ?>';
-                    break;
-
-                case 'true_false':
-                    $lines[] = '    <div class="enterprise-cpt-block__field">';
-                    $lines[] = '        <strong>' . esc_html($label) . ':</strong>';
-                    $lines[] = '        <?php echo ! empty( ' . $varName . ' ) ? \'Yes\' : \'No\'; ?>';
-                    $lines[] = '    </div>';
-                    break;
-
-                case 'textarea':
-                    $lines[] = '    <?php if ( ' . $varName . ' !== \'\' ) : ?>';
-                    $lines[] = '        <div class="enterprise-cpt-block__field">';
-                    $lines[] = '            <strong>' . esc_html($label) . ':</strong>';
-                    $lines[] = '            <?php echo wp_kses_post( wpautop( (string) ' . $varName . ' ) ); ?>';
-                    $lines[] = '        </div>';
-                    $lines[] = '    <?php endif; ?>';
-                    break;
-
-                default:
-                    $lines[] = '    <?php if ( ' . $varName . ' !== \'\' ) : ?>';
-                    $lines[] = '        <div class="enterprise-cpt-block__field">';
-                    $lines[] = '            <strong>' . esc_html($label) . ':</strong>';
-                    $lines[] = '            <span><?php echo esc_html( (string) ' . $varName . ' ); ?></span>';
-                    $lines[] = '        </div>';
-                    $lines[] = '    <?php endif; ?>';
-                    break;
-            }
-
-            $lines[] = '';
-        }
-
-        $lines[] = '</div>';
+        $lines[] = 'echo \\EnterpriseCPT\\Templates\\Resolver::render_default_block_markup( (array) $group, $fields );';
         $lines[] = '';
 
         return implode("\n", $lines);

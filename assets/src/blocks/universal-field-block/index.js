@@ -9,7 +9,7 @@
 import { registerBlockType } from '@wordpress/blocks';
 import Edit from './edit';
 
-const config = window.enterpriseCptEditor || { fieldGroups: [] };
+const config = window.enterpriseCptBlocks || { groups: [] };
 
 function toBlockSlug(name) {
     return String(name || '')
@@ -21,7 +21,40 @@ function toBlockSlug(name) {
         .replace(/^-|-$/g, '');
 }
 
-(config.fieldGroups || []).forEach((group) => {
+function normalizeBlockAttributeDefault(field) {
+    const fieldType = field?.type || 'text';
+    const defaultValue = field?.default;
+
+    if (fieldType === 'number' || fieldType === 'image') {
+        return Number.isFinite(Number(defaultValue)) ? Number(defaultValue) : 0;
+    }
+
+    if (fieldType === 'true_false') {
+        return Boolean(defaultValue);
+    }
+
+    if (fieldType === 'repeater') {
+        if (Array.isArray(defaultValue)) {
+            return defaultValue;
+        }
+
+        if (typeof defaultValue === 'string' && defaultValue !== '') {
+            try {
+                const parsed = JSON.parse(defaultValue);
+
+                return Array.isArray(parsed) ? parsed : [];
+            } catch {
+                return [];
+            }
+        }
+
+        return [];
+    }
+
+    return defaultValue ?? '';
+}
+
+(config.groups || []).forEach((group) => {
     if (!group.is_block) return;
 
     const groupSlug = group.name;
@@ -57,7 +90,7 @@ function toBlockSlug(name) {
 
         attributes[field.name] = {
             type,
-            default: field.default ?? '',
+            default: normalizeBlockAttributeDefault(field),
         };
     });
 

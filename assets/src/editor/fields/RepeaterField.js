@@ -116,7 +116,7 @@ function ImagePreview({ attachmentId }) {
 
 // ── SubfieldInput ────────────────────────────────────────────────────────────
 
-function SubfieldInput({ subfield, value, onChange }) {
+function SubfieldInput({ subfield, value, onChange, disabled = false }) {
     const type = subfield.type || 'text';
 
     if (type === 'textarea') {
@@ -125,6 +125,7 @@ function SubfieldInput({ subfield, value, onChange }) {
                 __nextHasNoMarginBottom
                 label={subfield.label || subfield.name}
                 value={String(value ?? '')}
+                disabled={disabled}
                 onChange={onChange}
             />
         );
@@ -138,6 +139,7 @@ function SubfieldInput({ subfield, value, onChange }) {
                 label={subfield.label || subfield.name}
                 type="number"
                 value={String(value ?? '')}
+                disabled={disabled}
                 onChange={(v) => onChange(v === '' ? '' : Number(v))}
             />
         );
@@ -151,6 +153,7 @@ function SubfieldInput({ subfield, value, onChange }) {
                 label={subfield.label || subfield.name}
                 type="email"
                 value={String(value ?? '')}
+                disabled={disabled}
                 onChange={onChange}
             />
         );
@@ -160,6 +163,7 @@ function SubfieldInput({ subfield, value, onChange }) {
         const attachmentId = Number(value) || 0;
 
         const openMedia = () => {
+            if (disabled) return;
             if (!window.wp?.media) return;
             const frame = window.wp.media({
                 title: subfield.label || 'Select Image',
@@ -187,7 +191,7 @@ function SubfieldInput({ subfield, value, onChange }) {
                 </p>
                 <ImagePreview attachmentId={attachmentId} />
                 <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                    <Button variant="secondary" isSmall onClick={openMedia}>
+                    <Button variant="secondary" isSmall disabled={disabled} onClick={openMedia}>
                         {attachmentId ? 'Replace Image' : 'Select Image'}
                     </Button>
                     {attachmentId > 0 && (
@@ -195,6 +199,7 @@ function SubfieldInput({ subfield, value, onChange }) {
                             variant="tertiary"
                             isDestructive
                             isSmall
+                            disabled={disabled}
                             onClick={() => onChange(0)}
                         >
                             Remove
@@ -212,6 +217,7 @@ function SubfieldInput({ subfield, value, onChange }) {
             __nextHasNoMarginBottom
             label={subfield.label || subfield.name}
             value={String(value ?? '')}
+            disabled={disabled}
             onChange={onChange}
         />
     );
@@ -219,7 +225,7 @@ function SubfieldInput({ subfield, value, onChange }) {
 
 // ── RepeaterField (Focus Canvas) ─────────────────────────────────────────────
 
-export default function RepeaterField({ field, value, onChange }) {
+export default function RepeaterField({ field, value, onChange, disabled = false }) {
     const schema = Array.isArray(field.rows) ? field.rows : [];
     const [rows, setRows] = useState(() => parseRepeater(value));
     const [focusedIndex, setFocusedIndex] = useState(null);
@@ -252,6 +258,8 @@ export default function RepeaterField({ field, value, onChange }) {
     // ── row mutations ────────────────────────────────────────────────────
 
     const addRow = () => {
+        if (disabled) return;
+
         const next = [...rows, blankRow(schema)];
         commitRows(next);
         setSnapshot(JSON.stringify(blankRow(schema)));
@@ -259,6 +267,8 @@ export default function RepeaterField({ field, value, onChange }) {
     };
 
     const removeRow = (idx) => {
+        if (disabled) return;
+
         const next = rows.filter((_, i) => i !== idx);
         commitRows(next);
         if (focusedIndex === idx) {
@@ -270,7 +280,7 @@ export default function RepeaterField({ field, value, onChange }) {
     };
 
     const cloneRow = (idx) => {
-        if (idx < 0 || idx >= rows.length) return;
+        if (disabled || idx < 0 || idx >= rows.length) return;
 
         // Deep clone to avoid object/array reference sharing between rows.
         const cloned = JSON.parse(JSON.stringify(rows[idx] ?? {}));
@@ -293,6 +303,8 @@ export default function RepeaterField({ field, value, onChange }) {
     };
 
     const updateCell = (rowIdx, colName, val) => {
+        if (disabled) return;
+
         commitRows(
             rows.map((row, i) =>
                 i === rowIdx ? { ...row, [colName]: val } : row,
@@ -303,15 +315,21 @@ export default function RepeaterField({ field, value, onChange }) {
     // ── drag-and-drop sorting ────────────────────────────────────────────
 
     const handleDragStart = (e, idx) => {
+        if (disabled) return;
+
         dragItem.current = idx;
         e.dataTransfer.effectAllowed = 'move';
     };
 
     const handleDragEnter = (idx) => {
+        if (disabled) return;
+
         setDragOverIndex(idx);
     };
 
     const handleDragEnd = () => {
+        if (disabled) return;
+
         const from = dragItem.current;
         const to = dragOverIndex;
         dragItem.current = null;
@@ -341,6 +359,11 @@ export default function RepeaterField({ field, value, onChange }) {
     };
 
     const discardChanges = () => {
+        if (disabled) {
+            closeFocus();
+            return;
+        }
+
         if (focusedIndex !== null && snapshot !== null) {
             const restored = JSON.parse(snapshot);
             commitRows(
@@ -361,7 +384,7 @@ export default function RepeaterField({ field, value, onChange }) {
     // ── Media Intelligence: Bulk Add from Media ──────────────────────────
 
     const bulkAddFromMedia = () => {
-        if (!window.wp?.media) return;
+        if (disabled || !window.wp?.media) return;
 
         const frame = window.wp.media({
             title: 'Select Images',
@@ -406,13 +429,14 @@ export default function RepeaterField({ field, value, onChange }) {
             >
                 <p style={{ fontWeight: 600, margin: 0 }}>{field.label}</p>
                 <div style={{ display: 'flex', gap: 8 }}>
-                    <Button variant="primary" isSmall onClick={addRow}>
+                    <Button variant="primary" isSmall disabled={disabled} onClick={addRow}>
                         + Add Row
                     </Button>
                     {hasImageSubfield && (
                         <Button
                             variant="secondary"
                             isSmall
+                            disabled={disabled}
                             onClick={bulkAddFromMedia}
                         >
                             Bulk Add from Media
@@ -443,7 +467,7 @@ export default function RepeaterField({ field, value, onChange }) {
                     {rows.map((row, idx) => (
                         <div
                             key={idx}
-                            draggable
+                            draggable={!disabled}
                             onDragStart={(e) => handleDragStart(e, idx)}
                             onDragEnter={() => handleDragEnter(idx)}
                             onDragEnd={handleDragEnd}
@@ -462,7 +486,7 @@ export default function RepeaterField({ field, value, onChange }) {
                                     dragOverIndex === idx
                                         ? '#f0f6fc'
                                         : '#fafafa',
-                                cursor: 'grab',
+                                cursor: disabled ? 'default' : 'grab',
                                 opacity:
                                     dragItem.current === idx ? 0.5 : 1,
                                 transition:
@@ -474,15 +498,16 @@ export default function RepeaterField({ field, value, onChange }) {
                                 style={{
                                     display: 'flex',
                                     color: '#999',
-                                    cursor: 'grab',
+                                    cursor: disabled ? 'default' : 'grab',
                                 }}
                             >
                                 <Button
                                     icon={dragHandle}
                                     label="Drag to reorder"
                                     isSmall
+                                    disabled={disabled}
                                     style={{
-                                        cursor: 'grab',
+                                        cursor: disabled ? 'default' : 'grab',
                                         minWidth: 0,
                                         padding: 0,
                                     }}
@@ -516,6 +541,7 @@ export default function RepeaterField({ field, value, onChange }) {
                                     icon={copy}
                                     label="Clone"
                                     isSmall
+                                    disabled={disabled}
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         cloneRow(idx);
@@ -526,6 +552,7 @@ export default function RepeaterField({ field, value, onChange }) {
                                     label="Delete"
                                     isSmall
                                     isDestructive
+                                    disabled={disabled}
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         removeRow(idx);
@@ -549,6 +576,7 @@ export default function RepeaterField({ field, value, onChange }) {
                                 key={col.name}
                                 subfield={col}
                                 value={rows[focusedIndex][col.name]}
+                                disabled={disabled}
                                 onChange={(val) =>
                                     updateCell(focusedIndex, col.name, val)
                                 }
@@ -567,9 +595,11 @@ export default function RepeaterField({ field, value, onChange }) {
                             borderTop: '1px solid #ddd',
                         }}
                     >
-                        <Button variant="tertiary" onClick={discardChanges}>
-                            Discard Changes
-                        </Button>
+                        {!disabled && (
+                            <Button variant="tertiary" onClick={discardChanges}>
+                                Discard Changes
+                            </Button>
+                        )}
                         <Button variant="primary" onClick={closeFocus}>
                             Done
                         </Button>

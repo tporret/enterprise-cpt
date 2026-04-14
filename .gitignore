@@ -24,6 +24,7 @@ Thumbs.db
 
 # Local planning/docs artifacts
 .docs/
+SECAuditWordPressLab.md
 
 # WordPress / Project-specific
 .wp-cli/

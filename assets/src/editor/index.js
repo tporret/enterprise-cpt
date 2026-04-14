@@ -30,8 +30,9 @@ const defaultFieldGroup = () => ({
     type: 'field_group',
     name: 'new_field_group',
     title: 'New Field Group',
-    post_type: 'post',
-    location_rules: [{ param: 'post_type', operator: '==', value: 'post' }],
+    post_type: '',
+    locations: [{ type: 'post_type', values: ['post'] }],
+    location_rules: [],
     custom_table_name: '',
     permissions: {
         minimum_role: 'any',
@@ -163,69 +164,62 @@ function HeaderBar({ title, isSaving, onBack, onSave, onExport }) {
     );
 }
 
-function LocationRulesPanel({ group, onGroupChange, locationOptions, loading }) {
-    const rule = group.location_rules?.[0] || { param: 'post_type', operator: '==', value: '' };
-    const [selectedValues, setSelectedValues] = useState(
-        Array.isArray(rule.value) ? rule.value : (rule.value ? [rule.value] : [])
-    );
-
-    useEffect(() => {
-        setSelectedValues(Array.isArray(rule.value) ? rule.value : (rule.value ? [rule.value] : []));
-    }, [rule.value]);
-
-    const getRuleOptions = () => {
-        if (rule.param === 'post_type') {
-            return locationOptions.post_types || [];
-        } else if (rule.param === 'taxonomy') {
-            return locationOptions.taxonomies || [];
-        } else if (rule.param === 'user_role') {
-            return locationOptions.user_roles || [];
-        }
-        return [];
-    };
-
-    const handleRuleParamChange = (newParam) => {
-        onGroupChange({
-            ...group,
-            location_rules: [{ ...rule, param: newParam, value: [] }],
-        });
-        setSelectedValues([]);
-    };
-
-    const handleValueChange = (newValue) => {
-        setSelectedValues(newValue);
-        onGroupChange({
-            ...group,
-            location_rules: [{ ...rule, value: newValue.length > 0 ? newValue : '' }],
-        });
-    };
-
-    const ruleOptions = getRuleOptions();
-
-    if (loading) {
-        return <Spinner />;
+function normalizeLocationsForEditor(group) {
+    if (Array.isArray(group.locations) && group.locations.length) {
+        return group.locations;
     }
 
-    return (
-        <>
-            <SelectControl
-                __next40pxDefaultSize
-                __nextHasNoMarginBottom
-                label="Rule Type"
-                value={rule.param || 'post_type'}
-                options={[
-                    { value: 'post_type', label: 'Post Type' },
-                    { value: 'taxonomy', label: 'Taxonomy' },
-                    { value: 'user_role', label: 'User Role' },
-                ]}
-                onChange={handleRuleParamChange}
-            />
-            <div className="location-rules-multi-select" style={{ marginTop: 12 }}>
-                <label style={{ display: 'block', marginBottom: 8, fontWeight: 500 }}>Selected Values</label>
+    const rules = Array.isArray(group.location_rules) ? group.location_rules : [];
+    const derived = {};
+
+    rules.forEach((ruleGroup) => {
+        const items = Array.isArray(ruleGroup?.rules) ? ruleGroup.rules : [];
+        items.forEach((rule) => {
+            if (!rule || !rule.param || !rule.value) return;
+            if (!derived[rule.param]) derived[rule.param] = new Set();
+            derived[rule.param].add(rule.value);
+        });
+    });
+
+    return Object.entries(derived).map(([type, values]) => ({
+        type,
+        values: Array.from(values),
+    }));
+}
+
+function LocationRulesPanel({ group, onGroupChange, locationOptions, loading }) {
+    const locations = normalizeLocationsForEditor(group);
+
+    const getSelectedValues = (type) => {
+        const location = locations.find((item) => item.type === type);
+        return Array.isArray(location?.values) ? location.values : [];
+    };
+
+    const updateLocation = (type, values) => {
+        const nextLocations = locations.filter((item) => item.type !== type);
+
+        if (values.length) {
+            nextLocations.push({ type, values });
+        }
+
+        onGroupChange({
+            ...group,
+            post_type: '',
+            locations: nextLocations,
+            location_rules: [],
+        });
+    };
+
+    const renderOptionGroup = (label, type, options) => {
+        const selectedValues = getSelectedValues(type);
+
+        return (
+            <div style={{ marginTop: 12 }}>
+                <label style={{ display: 'block', marginBottom: 8, fontWeight: 500 }}>{label}</label>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                    {ruleOptions.map((option) => (
+                    {options.map((option) => (
                         <label
-                            key={option.value}
+                            key={`${type}-${option.value}`}
                             style={{
                                 display: 'flex',
                                 alignItems: 'center',
@@ -240,11 +234,11 @@ function LocationRulesPanel({ group, onGroupChange, locationOptions, loading }) 
                             <input
                                 type="checkbox"
                                 checked={selectedValues.includes(option.value)}
-                                onChange={(e) => {
-                                    if (e.target.checked) {
-                                        handleValueChange([...selectedValues, option.value]);
+                                onChange={(event) => {
+                                    if (event.target.checked) {
+                                        updateLocation(type, [...selectedValues, option.value]);
                                     } else {
-                                        handleValueChange(selectedValues.filter(v => v !== option.value));
+                                        updateLocation(type, selectedValues.filter((value) => value !== option.value));
                                     }
                                 }}
                             />
@@ -253,6 +247,18 @@ function LocationRulesPanel({ group, onGroupChange, locationOptions, loading }) 
                     ))}
                 </div>
             </div>
+        );
+    };
+
+    if (loading) {
+        return <Spinner />;
+    }
+
+    return (
+        <>
+            {renderOptionGroup('Post Types', 'post_type', locationOptions.post_types || [])}
+            {renderOptionGroup('Taxonomies', 'taxonomy', locationOptions.taxonomies || [])}
+            {renderOptionGroup('User Roles', 'user_role', locationOptions.user_roles || [])}
         </>
     );
 }
@@ -285,13 +291,6 @@ function Sidebar({ group, activeFieldIndex, onGroupChange, onFieldChange, locati
                         label="Title"
                         value={group.title || ''}
                         onChange={(value) => onGroupChange({ ...group, title: value })}
-                    />
-                    <TextControl
-            __next40pxDefaultSize
-            __nextHasNoMarginBottom
-                        label="Post Type"
-                        value={group.post_type || ''}
-                        onChange={(value) => onGroupChange({ ...group, post_type: slugify(value) })}
                     />
                     <TextControl
             __next40pxDefaultSize

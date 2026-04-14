@@ -21,13 +21,32 @@ final class TableManager
     ) {}
 
     /**
-     * Create (or ALTER to add missing columns for) the custom table for a field group.
-     *
-     * Uses dbDelta for safe CREATE TABLE / add-column operations, then
-     * explicitly ALTERs for any columns dbDelta may have missed.
+     * Resolve the site-specific table name.
+     * 
+     * In a multisite environment, we must ensure the table is prefixed with the 
+     * current blog's prefix to maintain data isolation.
+     */
+    public function tableName(string $customTableName): string
+    {
+        global $wpdb;
+        
+        // Use the current blog's prefix (e.g., wp_2_) instead of the global prefix
+        return $wpdb->prefix . 'enterprise_' . sanitize_key($customTableName);
+    }
+
+    /**
+     * Create a site-specific table name for a repeater's child table.
+     */
+    private function repeaterTableName(string $fieldSlug): string
+    {
+        global $wpdb;
+        return $wpdb->prefix . 'enterprise_repeater_' . $fieldSlug;
+    }
+
+    /**
+     * Create (or alter to add missing columns for) the custom table for a field group.
      *
      * @param array<string, mixed> $groupDefinition
-     * @return string Fully-qualified table name, or '' when no custom_table_name is set.
      */
     public function createOrAlter(array $groupDefinition): string
     {
@@ -42,21 +61,24 @@ final class TableManager
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 
         $tableName = $this->tableName($customTableName);
-        $charset   = $wpdb->get_charset_collate();
-        $fields    = is_array($groupDefinition['fields'] ?? null) ? $groupDefinition['fields'] : [];
+        $charset = $wpdb->get_charset_collate();
+        $fields = is_array($groupDefinition['fields'] ?? null) ? $groupDefinition['fields'] : [];
 
-        // Build CREATE TABLE SQL with every field as a column.
         $columnSql = '';
 
         foreach ($fields as $field) {
-            $col = sanitize_key((string) ($field['name'] ?? ''));
-
-            if ($col === '') {
+            if (! is_array($field)) {
                 continue;
             }
 
-            $type       = FieldType::fromString((string) ($field['type'] ?? 'text'));
-            $columnSql .= "  `{$col}` {$type->columnSql()},\n";
+            $columnName = sanitize_key((string) ($field['name'] ?? ''));
+
+            if ($columnName === '') {
+                continue;
+            }
+
+            $type = FieldType::fromString((string) ($field['type'] ?? 'text'));
+            $columnSql .= "  `{$columnName}` {$type->columnSql()},\n";
         }
 
         $sql = "CREATE TABLE {$tableName} (\n"
@@ -69,27 +91,31 @@ final class TableManager
 
         dbDelta($sql);
 
-        // Belt-and-suspenders: ALTER TABLE for any column dbDelta may have skipped.
         $existing = $this->existingColumns($tableName);
 
         foreach ($fields as $field) {
-            $col = sanitize_key((string) ($field['name'] ?? ''));
+            if (! is_array($field)) {
+                continue;
+            }
 
-            if ($col === '' || in_array($col, $existing, true)) {
+            $columnName = sanitize_key((string) ($field['name'] ?? ''));
+
+            if ($columnName === '' || in_array($columnName, $existing, true)) {
                 continue;
             }
 
             $type = FieldType::fromString((string) ($field['type'] ?? 'text'));
 
             // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-            $wpdb->query("ALTER TABLE `{$tableName}` ADD COLUMN `{$col}` {$type->columnSql()}");
+            $wpdb->query("ALTER TABLE `{$tableName}` ADD COLUMN `{$columnName}` {$type->columnSql()}");
         }
 
-        // Create child tables for repeater fields.
         foreach ($fields as $field) {
-            if (($field['type'] ?? '') === 'repeater') {
-                $this->createOrAlterRepeaterTable($field);
+            if (! is_array($field) || ($field['type'] ?? '') !== 'repeater') {
+                continue;
             }
+
+            $this->createOrAlterRepeaterTable($field);
         }
 
         return $tableName;
@@ -113,7 +139,7 @@ final class TableManager
 
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 
-        $tableName = $this->tableName('enterprise_repeater_' . $fieldName);
+        $tableName = $this->repeaterTableName($fieldName);
         $charset   = $wpdb->get_charset_collate();
         $subfields = is_array($field['rows'] ?? null) ? $field['rows'] : [];
 
@@ -177,14 +203,7 @@ final class TableManager
     }
 
     /**
-     * Resolve the fully-qualified table name from the bare custom_table_name value.
-     */
-    public function tableName(string $customTableName): string
-    {
-        return $this->tablePrefix . sanitize_key($customTableName);
-    }
 
-    /**
      * Return column names currently present in a table.
      *
      * Used to determine which ALTER TABLE ADD COLUMN statements are needed.

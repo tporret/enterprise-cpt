@@ -12,7 +12,7 @@ import { Fragment } from '@wordpress/element';
 import { registerPlugin } from '@wordpress/plugins';
 import RepeaterField from '../editor/fields/RepeaterField';
 
-const config = window.enterpriseCptEditor || { fieldGroups: [] };
+const config = window.enterpriseCptEditor || { groups: [] };
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -22,20 +22,13 @@ function toStr(value) {
 }
 
 function normalizeChoices(choices) {
-    if (!Array.isArray(choices)) return [];
-    return choices
-        .filter((c) => c && typeof c === 'object' && c.value !== undefined)
-        .map((c) => ({ value: String(c.value), label: String(c.label || c.value) }));
-}
-
-function parseRepeater(value) {
-    if (Array.isArray(value)) return value;
-    try {
-        const parsed = JSON.parse(String(value || '[]'));
-        return Array.isArray(parsed) ? parsed : [];
-    } catch {
+    if (!Array.isArray(choices)) {
         return [];
     }
+
+    return choices
+        .filter((choice) => choice && typeof choice === 'object' && choice.value !== undefined)
+        .map((choice) => ({ value: String(choice.value), label: String(choice.label || choice.value) }));
 }
 
 // ─── FieldRenderer ────────────────────────────────────────────────────────────
@@ -129,13 +122,17 @@ function FieldRenderer({ field, value, onChange }) {
 
     if (type === 'true_false') {
         return (
-            <ToggleControl
-                        __nextHasNoMarginBottom
-                label={field.label}
-                help={field.help || `${field.on_text || 'On'} / ${field.off_text || 'Off'}`}
-                checked={Boolean(value)}
-                onChange={(checked) => onChange(Boolean(checked))}
-            />
+            <div style={{ marginBottom: 16 }}>
+                <ToggleControl
+                    label={field.label}
+                    help={field.help || undefined}
+                    checked={Boolean(value)}
+                    onChange={(checked) => onChange(Boolean(checked))}
+                />
+                <div style={{ fontSize: 12, color: '#50575e', marginTop: 4 }}>
+                    {`${field.on_text || 'On'} / ${field.off_text || 'Off'}`}
+                </div>
+            </div>
         );
     }
 
@@ -165,8 +162,8 @@ function PostEditorPlugin() {
     );
     const { editPost } = useDispatch('core/editor');
 
-    const fieldGroups = (config.fieldGroups || []).filter(
-        (g) => g.post_type === postType && !g.is_block
+    const fieldGroups = (config.groups || []).filter(
+        (g) => (g.post_type === postType || (Array.isArray(g.locations) && g.locations.some(l => l.type === 'post_type' && l.values?.includes(postType)))) && !g.is_block
     );
 
     if (!fieldGroups.length) return null;

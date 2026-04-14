@@ -23,10 +23,11 @@ import { useBlockProps, BlockControls } from '@wordpress/block-editor';
 import { ToolbarGroup, ToolbarButton } from '@wordpress/components';
 import { useSelect } from '@wordpress/data';
 import { pencil } from '@wordpress/icons';
+import RepeaterField from '../../editor/fields/RepeaterField';
 import { v4 as uuidv4 } from './uuid';
 import LivePreview from './components/LivePreview';
 
-const config = window.enterpriseCptEditor || { fieldGroups: [] };
+const config = window.enterpriseCptBlocks || { groups: [] };
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -42,25 +43,43 @@ function normalizeChoices(choices) {
         .map((c) => ({ value: String(c.value), label: String(c.label || c.value) }));
 }
 
-function getFieldGroup(slug) {
-    const normalized = String(slug || '')
+function normalizeRepeaterValue(value) {
+    if (Array.isArray(value)) {
+        return value;
+    }
+
+    if (typeof value !== 'string' || value === '') {
+        return [];
+    }
+
+    try {
+        const parsed = JSON.parse(value);
+
+        return Array.isArray(parsed) ? parsed : [];
+    } catch {
+        return [];
+    }
+}
+
+function toBlockSlug(value) {
+    return String(value || '')
         .toLowerCase()
         .replace(/_/g, '-')
         .replace(/[^a-z0-9-]/g, '-')
         .replace(/-+/g, '-')
         .replace(/^-|-$/g, '');
+}
+
+function getFieldGroup(slug) {
+    const normalized = toBlockSlug(slug);
 
     return (
-        (config.fieldGroups || []).find((g) => {
+        (config.groups || []).find((g) => {
             const groupName = String(g.name || '');
-            const groupBlockSlug = groupName
-                .toLowerCase()
-                .replace(/_/g, '-')
-                .replace(/[^a-z0-9-]/g, '-')
-                .replace(/-+/g, '-')
-                .replace(/^-|-$/g, '');
+            const groupNameSlug = toBlockSlug(groupName);
+            const groupBlockSlug = toBlockSlug(g.block_slug || groupName);
 
-            return groupName === slug || groupBlockSlug === normalized;
+            return groupName === slug || groupNameSlug === normalized || groupBlockSlug === normalized;
         }) || null
     );
 }
@@ -69,6 +88,16 @@ function getFieldGroup(slug) {
 
 function SubfieldRenderer({ field, value, onChange, disabled = false }) {
     const type = field.type || 'text';
+
+    if (type === 'repeater') {
+        return (
+            <RepeaterField
+                field={field}
+                value={normalizeRepeaterValue(value)}
+                onChange={(nextValue) => onChange(normalizeRepeaterValue(nextValue))}
+            />
+        );
+    }
 
     if (type === 'textarea') {
         return (
@@ -157,14 +186,18 @@ function SubfieldRenderer({ field, value, onChange, disabled = false }) {
 
     if (type === 'true_false') {
         return (
-            <ToggleControl
-                        __nextHasNoMarginBottom
-                label={field.label}
-                help={field.help || `${field.on_text || 'On'} / ${field.off_text || 'Off'}`}
-                checked={Boolean(value)}
-                disabled={disabled}
-                onChange={(checked) => onChange(Boolean(checked))}
-            />
+            <div style={{ marginBottom: 16 }}>
+                <ToggleControl
+                    label={field.label}
+                    help={field.help || undefined}
+                    checked={Boolean(value)}
+                    disabled={disabled}
+                    onChange={(checked) => onChange(Boolean(checked))}
+                />
+                <div style={{ fontSize: 12, color: '#50575e', marginTop: 4 }}>
+                    {`${field.on_text || 'On'} / ${field.off_text || 'Off'}`}
+                </div>
+            </div>
         );
     }
 

@@ -164,6 +164,117 @@ final class Plugin
         return $registeredFields;
     }
 
+    public function registerBlocks(): void
+    {
+        $this->blockFactory->register();
+    }
+
+    /**
+     * Build the bootstrap data for the Gutenberg post editor panel.
+     * 
+     * This identifies the current post type, evaluates which field groups 
+     * should be visible, and provides the definitions to the React frontend.
+     */
+    public function editorBootstrapData(): array
+    {
+        $postType = $this->resolveCurrentEditorPostType();
+        
+        $context = [
+            'post_type' => $postType,
+            'user_role' => $this->getCurrentUserRoles(),
+        ];
+
+        $matchedGroupIds = $this->locationEvaluator->get_groups_for_context($context);
+        
+        $definitions = $this->fieldGroupEngine->definitions();
+        $activeGroups = [];
+
+        foreach ($matchedGroupIds as $groupId) {
+            if (isset($definitions[$groupId])) {
+                $activeGroups[] = $definitions[$groupId];
+            }
+        }
+
+        return [
+            'postType' => $postType,
+            'groups'   => $activeGroups,
+            'postId' => $this->resolveCurrentEditorPostId(),
+            'restUrl' => rest_url('enterprise-cpt/v1/'),
+            'nonce'    => wp_create_nonce('wp_rest'),
+        ];
+    }
+
+    public function blockEditorBootstrapData(): array
+    {
+        $groups = $this->filterFieldGroupsForCurrentUser(
+            $this->fieldGroupDefinitions(),
+            get_current_user_id()
+        );
+
+        $blockGroups = array_values(array_filter(
+            $groups,
+            static fn (array $group): bool => ! empty($group['is_block'])
+        ));
+
+        return [
+            'groups' => $blockGroups,
+            'restUrl' => rest_url('enterprise-cpt/v1/'),
+            'nonce' => wp_create_nonce('wp_rest'),
+        ];
+    }
+
+    private function resolveCurrentEditorPostId(): int
+    {
+        $requestPostId = isset($_GET['post']) ? (int) $_GET['post'] : 0;
+
+        if ($requestPostId > 0) {
+            return $requestPostId;
+        }
+
+        $requestPostId = isset($_POST['post_ID']) ? (int) $_POST['post_ID'] : 0;
+
+        if ($requestPostId > 0) {
+            return $requestPostId;
+        }
+
+        global $post;
+
+        if ($post instanceof \WP_Post) {
+            return (int) $post->ID;
+        }
+
+        return 0;
+    }
+
+    private function resolveCurrentEditorPostType(): string
+    {
+        $postId = $this->resolveCurrentEditorPostId();
+
+        if ($postId > 0) {
+            $resolved = get_post_type($postId);
+
+            if (is_string($resolved) && $resolved !== '') {
+                return $resolved;
+            }
+        }
+
+        $screen = function_exists('get_current_screen') ? get_current_screen() : null;
+
+        if ($screen instanceof \WP_Screen && is_string($screen->post_type) && $screen->post_type !== '') {
+            return $screen->post_type;
+        }
+
+        $fallback = get_post_type();
+
+        return is_string($fallback) ? $fallback : '';
+    }
+
+    private function getCurrentUserRoles(): array
+    {
+        $user = wp_get_current_user();
+        return (array) $user->roles;
+    }
+
     public function enqueueBlockEditorAssets(): void
     {
         $scriptPath = ENTERPRISE_CPT_PATH . 'assets/build/index/index.js';
@@ -190,6 +301,62 @@ final class Plugin
         );
 
         wp_enqueue_script('enterprise-cpt-editor');
+    }
+
+    public function enqueueBlockAssets(): void
+    {
+        $scriptPath = ENTERPRISE_CPT_PATH . 'assets/build/blocks/blocks.js';
+        $assetPath = ENTERPRISE_CPT_PATH . 'assets/build/blocks/blocks.asset.php';
+
+        if (! is_readable($scriptPath) || ! is_readable($assetPath)) {
+            return;
+        }
+
+        $asset = require $assetPath;
+
+        wp_register_script(
+            'enterprise-cpt-blocks',
+            ENTERPRISE_CPT_URL . 'assets/build/blocks/blocks.js',
+            $asset['dependencies'] ?? [],
+            $asset['version'] ?? ENTERPRISE_CPT_VERSION,
+            true
+        );
+
+        wp_add_inline_script(
+            'enterprise-cpt-blocks',
+            'window.enterpriseCptBlocks = ' . wp_json_encode($this->blockEditorBootstrapData()) . ';',
+            'before'
+        );
+
+        wp_enqueue_script('enterprise-cpt-blocks');
+    }
+
+    /**
+     * Register the custom block inserter category for Enterprise CPT blocks.
+     *
+     * @param array<int, array<string, mixed>> $categories
+     * @return array<int, array<string, mixed>>
+     */
+    public function registerBlockCategory(array $categories, \WP_Block_Editor_Context $context): array
+    {
+        foreach ($categories as $category) {
+            if (($category['slug'] ?? '') === 'enterprise-cpt') {
+                return $categories;
+            }
+        }
+
+        $categories[] = [
+            'slug'  => 'enterprise-cpt',
+            'title' => 'Enterprise CPT',
+            'icon'  => null,
+        ];
+
+        return $categories;
+    }
+
+    public function syncBlockFieldsToCustomTable($preparedPost, $request)
+    {
+        return $preparedPost;
     }
 
     public function definitionSummary(): array
@@ -581,11 +748,21 @@ final class Plugin
             return $content;
         }
 
-        $groups = array_values(array_filter(
-            $this->fieldGroupDefinitions(),
-            static fn (array $group): bool => sanitize_key((string) ($group['post_type'] ?? '')) === $post->post_type
-                && empty($group['is_block'])
-        ));
+        $groupIds = $this->locationEvaluator->get_groups_for_context([
+            'post_type' => $post->post_type,
+            'user_role' => wp_get_current_user()->roles,
+        ]);
+
+        $definitions = $this->fieldGroupEngine->definitions();
+        $groups = [];
+
+        foreach ($groupIds as $groupId) {
+            if (! isset($definitions[$groupId]) || ! empty($definitions[$groupId]['is_block'])) {
+                continue;
+            }
+
+            $groups[] = $definitions[$groupId];
+        }
 
         if ($groups === []) {
             return $content;
@@ -764,209 +941,6 @@ final class Plugin
         }
 
         return $imgTag;
-    }
-
-    private function editorBootstrapData(): array
-    {
-        $fieldGroups = $this->filterFieldGroupsForCurrentUser($this->fieldGroupDefinitions(), get_current_user_id());
-
-        return [
-            'fieldGroups' => $fieldGroups,
-            'restBase'    => rest_url('enterprise-cpt/v1'),
-            'nonce'       => wp_create_nonce('wp_rest'),
-        ];
-    }
-
-    // ── Block Bridge ─────────────────────────────────────────────────────
-
-    public function registerBlocks(): void
-    {
-        $this->blockFactory->register();
-    }
-
-    /**
-     * Register the "Enterprise CPT" block category.
-     */
-    public function registerBlockCategory(array $categories, mixed $context): array
-    {
-        return array_merge($categories, [
-            [
-                'slug'  => 'enterprise-cpt',
-                'title' => 'Enterprise CPT',
-                'icon'  => 'screenoptions',
-            ],
-        ]);
-    }
-
-    /**
-     * Enqueue the blocks JS bundle in the block editor.
-     */
-    public function enqueueBlockAssets(): void
-    {
-        $scriptPath = ENTERPRISE_CPT_PATH . 'assets/build/blocks/blocks.js';
-        $assetPath  = ENTERPRISE_CPT_PATH . 'assets/build/blocks/blocks.asset.php';
-
-        if (! is_readable($scriptPath) || ! is_readable($assetPath)) {
-            return;
-        }
-
-        $asset = require $assetPath;
-
-        wp_register_script(
-            'enterprise-cpt-blocks',
-            ENTERPRISE_CPT_URL . 'assets/build/blocks/blocks.js',
-            $asset['dependencies'] ?? [],
-            $asset['version'] ?? ENTERPRISE_CPT_VERSION,
-            true
-        );
-
-        wp_enqueue_script('enterprise-cpt-blocks');
-    }
-
-    /**
-     * Storage Resolver: intercept post saves and sync Enterprise Block data
-     * to the associated custom table.
-     *
-     * Parses post_content for enterprise-cpt/* blocks, extracts attributes,
-     * and upserts into the custom table keyed by block_instance_id.
-     */
-    public function syncBlockFieldsToCustomTable(\stdClass $prepared, \WP_REST_Request $request): \stdClass|\WP_Error
-    {
-        $content = $prepared->post_content ?? '';
-
-        if ($content === '' || !str_contains($content, '<!-- wp:enterprise-cpt/')) {
-            return $prepared;
-        }
-
-        $blocks = parse_blocks($content);
-        $postId = (int) ($prepared->ID ?? 0);
-
-        if ($postId <= 0) {
-            return $prepared;
-        }
-
-        $blockGroups = array_filter(
-            $this->fieldGroupEngine->definitionList(),
-            static fn(array $g): bool => !empty($g['is_block']) && ($g['custom_table_name'] ?? '') !== '',
-        );
-
-        if ($blockGroups === []) {
-            return $prepared;
-        }
-
-        $groupsBySlug = [];
-
-        foreach ($blockGroups as $g) {
-            $groupSlug = sanitize_key((string) ($g['name'] ?? ''));
-            $configuredBlockSlug = sanitize_key((string) ($g['block_slug'] ?? ''));
-
-            if ($groupSlug === '') {
-                continue;
-            }
-
-            $groupsBySlug[$groupSlug] = $g;
-            if ($configuredBlockSlug !== '') {
-                $groupsBySlug[$configuredBlockSlug] = $g;
-            }
-            $groupsBySlug[$this->toBlockSlug($groupSlug)] = $g;
-        }
-
-        foreach ($blocks as $block) {
-            $blockName = $block['blockName'] ?? '';
-
-            if (!str_starts_with($blockName, 'enterprise-cpt/')) {
-                continue;
-            }
-
-            $slug = substr($blockName, strlen('enterprise-cpt/'));
-
-            if (!isset($groupsBySlug[$slug])) {
-                continue;
-            }
-
-            $group = $groupsBySlug[$slug];
-            $attrs = $block['attrs'] ?? [];
-            $instanceId = $attrs['blockInstanceId'] ?? '';
-
-            if ($instanceId === '') {
-                continue;
-            }
-
-            $groupSlug = sanitize_key((string) ($group['name'] ?? ''));
-            $accessLevel = $this->permissionResolver->get_user_access_level($groupSlug, get_current_user_id());
-
-            if ($accessLevel !== PermissionResolver::ACCESS_FULL) {
-                return new \WP_Error(
-                    'enterprise_cpt_forbidden_block_write',
-                    sprintf('You do not have permission to edit block data for group "%s".', $groupSlug),
-                    ['status' => 403]
-                );
-            }
-
-            $this->upsertBlockData($group, $postId, $instanceId, $attrs);
-        }
-
-        return $prepared;
-    }
-
-    /**
-     * Upsert block field data into the field group's custom table.
-     */
-    private function upsertBlockData(array $group, int $postId, string $instanceId, array $attrs): void
-    {
-        global $wpdb;
-
-        $tableName = $wpdb->prefix . sanitize_key($group['custom_table_name']);
-        $fields    = is_array($group['fields'] ?? null) ? $group['fields'] : [];
-
-        // Build data for upsert.
-        $columns = ['post_id' => $postId, 'block_instance_id' => sanitize_text_field($instanceId)];
-        $formats = ['%d', '%s'];
-        $updates = [];
-
-        foreach ($fields as $field) {
-            if (!is_array($field)) {
-                continue;
-            }
-
-            $col = sanitize_key((string) ($field['name'] ?? ''));
-
-            if ($col === '' || !array_key_exists($col, $attrs)) {
-                continue;
-            }
-
-            $value = $attrs[$col];
-
-            if (is_array($value) || is_object($value)) {
-                $columns[$col] = wp_json_encode($value);
-                $formats[]     = '%s';
-            } elseif (is_numeric($value) && !is_string($value)) {
-                $columns[$col] = $value;
-                $formats[]     = is_float($value) ? '%f' : '%d';
-            } else {
-                $columns[$col] = (string) $value;
-                $formats[]     = '%s';
-            }
-
-            $updates[] = "`{$col}` = VALUES(`{$col}`)";
-        }
-
-        if ($updates === []) {
-            return;
-        }
-
-        $colNames    = implode('`, `', array_keys($columns));
-        $placeholders = implode(', ', $formats);
-        $updateClause = implode(', ', $updates);
-
-        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-        $wpdb->query(
-            $wpdb->prepare(
-                "INSERT INTO `{$tableName}` (`{$colNames}`) VALUES ({$placeholders})"
-                . " ON DUPLICATE KEY UPDATE {$updateClause}",
-                ...array_values($columns)
-            )
-        );
     }
 
     private function toBlockSlug(string $slug): string

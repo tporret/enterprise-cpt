@@ -13,15 +13,16 @@ Enterprise CPT is a JSON-first plugin for managing Custom Post Types and Field G
 
 == Description ==
 
-Enterprise CPT gives site owners and teams a clean admin workflow for building content models while keeping definitions portable and versionable.
+Enterprise CPT gives site owners and teams a clean workflow for building custom content models while keeping schemas portable and versionable.
 
-You can:
+You can use it to:
 
-- Create and edit Custom Post Types from wp-admin
-- Manage Field Groups in a native Gutenberg-style List + Editor interface
-- Use custom SQL table storage for field groups (with postmeta shadow compatibility)
-- Keep definitions in JSON with read-only environment fallback to DB buffer
-- Save and edit safely in containerized environments
+- create and edit Custom Post Types from wp-admin
+- manage field groups in a modern list-and-editor interface
+- assign field groups to multiple post types, taxonomies, or user roles
+- store field data in post meta or custom SQL tables
+- expose field groups as native Gutenberg blocks
+- keep JSON-backed definitions working in read-only environments through buffered fallbacks
 
 == Features ==
 
@@ -40,7 +41,8 @@ You can:
 - Save and export field group schemas
 - Standard field types: Text, Textarea, Number, Email, True/False, Select, Radio, Repeater
 - Type-specific settings (number ranges/step, true/false labels, select/radio choices)
-= Repeater Focus Canvas =
+
+= Repeater Editing =
 
 - List view with drag-and-drop row reordering (HTML5 DnD)
 - Per-row Edit (pencil), Clone (copy), and Delete (trash) icon actions
@@ -50,32 +52,21 @@ You can:
 - Bulk image row creation from the media library
 - Inline image preview, replace, and remove controls
 
-= Drag-and-Drop Reordering =
 
-- Reorder Field Groups in the list view by dragging the handle
-- Reorder Fields within a field group editor by dragging the handle
-- All changes auto-save automatically
-
-= Multi-Select Location Rules =
+= Location Rules =
 
 - Field groups can appear on multiple post types, taxonomies, or user roles simultaneously
 - Checkbox-based multi-select UI for selecting multiple location targets
 - OR logic: field group shows when context matches ANY selected value
-- Supports backward compatibility with single-value rules
+- Supports the canonical `locations` model and legacy single-value rules
 
-= Field-to-Block Bridge =
+
+= Block Bridge =
 
 - Any field group can become a native Gutenberg block by adding `"is_block": true` to its JSON
 - Blocks appear in the **Enterprise CPT** block category in the inserter
 - Universal Edit component shows a canvas summary view and opens a Focus Canvas modal for editing
 - Live preview in the editor is server-rendered and uses the same template resolution path as frontend output
-- Works in FSE-capable themes (Site Editor templates, template parts, and patterns)
-- Smart preview mode adapts by editor context:
-	1. Post Editor: fast live SSR updates
-	2. Site Editor: lower-frequency SSR updates with manual **Refresh Preview** control
-- Site Editor editing pauses preview fetch while typing in the Focus Canvas modal to reduce server load
-- If SSR preview fails in Site Editor, the block shows a non-breaking field summary fallback instead of a hard block error
-- Preview responses are cached per block+attributes to avoid repeated server calls for unchanged content
 - Enterprise Template Resolver checks templates in this order:
 	1. Active Theme: `{theme}/enterprise-cpt/blocks/{slug}.php`
 	2. Persistent Storage: `wp-content/uploads/enterprise-cpt/templates/{slug}.php`
@@ -85,6 +76,8 @@ You can:
 - Upload template folder is hardened with `index.php` and `.htaccess`
 - Block data is saved to the field group's custom table via `rest_pre_insert_post`, keyed by `block_instance_id`
 - Multiple blocks of the same type on one page each get an isolated row in the custom table
+- Repeater rows render as structured content instead of raw arrays
+- Repeater image subfields render real image tags on the frontend
 
 = Block Templates: How To Use =
 
@@ -93,11 +86,6 @@ You can:
 3. Customize output by creating a theme template at:
 	 - `wp-content/themes/your-theme/enterprise-cpt/blocks/{slug}.php`
 4. If no theme template exists, Enterprise CPT uses uploads scaffold (if available), then plugin fallback.
-
-For Site Editor users:
-
-- Use **Refresh Preview** after larger edits when working in templates/template parts.
-- If live SSR is temporarily unavailable, the block shows a summary fallback and remains editable.
 
 Template variables:
 
@@ -119,13 +107,8 @@ Field groups can now appear on multiple post types, taxonomies, or user roles us
 
 Example: A "Product Details" field group can appear on Post, Product, and Service post types simultaneously.
 
-= Drag-and-Drop Reordering =
 
-- Reorder field groups in the list view by dragging the handle icons
-- Reorder fields within a field group editor by dragging the handle icons
-- Changes auto-save automatically
-
-= Performance Storage =
+= Storage =
 
 - Optional custom table storage per field group
 - Relational repeater child-table storage in custom table mode (`wp_enterprise_repeater_{field_name}`)
@@ -134,8 +117,9 @@ Example: A "Product Details" field group can appear on Post, Product, and Servic
 
 = Frontend Output =
 
-- Repeater image fields render as actual images on frontend output (not raw attachment IDs)
-- Repeater rows continue to render as structured lists for content clarity
+- Shared rendering path for editor previews and frontend block output
+- Repeater image fields render as actual images on frontend output
+- Repeater rows render as structured content for clearer output
 
 = REST API =
 
@@ -171,7 +155,7 @@ In wp-admin, open **Enterprise CPT > Post Types**.
 
 = Where do I assign custom fields to my post types? =
 
-Use **Enterprise CPT > Field Groups** and set the group location to your post type.
+Use **Enterprise CPT > Field Groups** and set the group location under **Location Rules**.
 
 = Can I use normal postmeta instead of custom tables? =
 
@@ -185,10 +169,20 @@ Definition saves are buffered into WordPress options when files are not writable
 
 No. Shadow sync and compatibility paths are included to support standard WordPress metadata access patterns.
 
+= Can one field group be reused in more than one place? =
+
+Yes. A single field group can target multiple post types, taxonomies, or user roles at the same time.
+
+= How do block templates work? =
+
+Create a theme template at `wp-content/themes/your-theme/enterprise-cpt/blocks/{slug}.php`. If no theme template exists, the plugin can use an uploads scaffold or the built-in fallback renderer.
+
 == Changelog ==
 
 = 0.5.0 =
 
+- Block rendering cleanup: shared schema-aware renderer now handles repeater rows and repeater image subfields consistently on the frontend
+- Generated uploads block templates now route through the same default renderer as the plugin fallback
 - Multi-select location rules: field groups can now appear on multiple post types, taxonomies, or user roles simultaneously
 - Checkbox-based UI for selecting multiple location targets with OR logic
 - New REST endpoint `/location-options` returns available post types, taxonomies, and user roles
