@@ -179,6 +179,13 @@ Create a theme template at `wp-content/themes/your-theme/enterprise-cpt/blocks/{
 
 == Changelog ==
 
+= 0.5.1 =
+
+- Refactored admin/editor inline layout styles into shared WPDS-friendly stylesheet classes
+- Added shared `assets/src/common/admin-style.css` for editor and CPT manager bundles
+- Validated full build success across all JavaScript asset bundles with `npm run build`
+- Confirmed no current reliance on WP Interactivity API or WP Abilities API in plugin source
+
 = 0.5.0 =
 
 - Block rendering cleanup: shared schema-aware renderer now handles repeater rows and repeater image subfields consistently on the frontend

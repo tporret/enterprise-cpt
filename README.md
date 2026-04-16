@@ -183,6 +183,13 @@ The default renderer is schema-aware for:
 - If a block fix appears correct in plugin templates but not on the live site, inspect uploads-based block templates first because they can override the plugin fallback.
 - Read-only file systems still work through option-buffer fallbacks, but write-path behavior should be tested explicitly.
 
+## Today's audit updates
+
+- Refactored admin/editor inline layout styling into shared CSS classes and centralized styles in `assets/src/common/admin-style.css`.
+- Validated the full build with `npm run build` across `index`, `editor`, `cpt-manager`, and `blocks` bundles.
+- Confirmed the plugin currently does not use WP Interactivity API or WP Abilities API.
+- The existing custom permission layer remains the active security model unless future ability/catalog integration is required.
+
 ## License
 
 GPL-2.0-or-later
