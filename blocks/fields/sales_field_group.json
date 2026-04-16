@@ -5,16 +5,16 @@
     "post_type": "post",
     "location_rules": [
         {
-            "param": "post_type",
-            "operator": "==",
-            "value": "post"
+            "rules": [
+                {
+                    "param": "post_type",
+                    "operator": "==",
+                    "value": "post"
+                }
+            ]
         }
     ],
     "custom_table_name": "",
-    "is_block": true,
-    "block_icon": "admin-post",
-    "block_category": "enterprise-cpt",
-    "block_description": "This to show sale numbers",
     "fields": [
         {
             "type": "text",
@@ -31,7 +31,57 @@
             "off_text": "Off",
             "choices": [],
             "rows": []
+        },
+        {
+            "type": "radio",
+            "name": "enterprise_cpt_field_2",
+            "label": "Field 2",
+            "help": "",
+            "show_in_rest": true,
+            "single": true,
+            "default": "",
+            "min": "",
+            "max": "",
+            "step": "",
+            "on_text": "On",
+            "off_text": "Off",
+            "choices": [
+                {
+                    "value": "option_1",
+                    "label": "Option 1"
+                },
+                {
+                    "value": "option_2",
+                    "label": "Option 2"
+                },
+                {
+                    "value": "option_3",
+                    "label": "Option 3"
+                },
+                {
+                    "value": "option_4",
+                    "label": "Option 4"
+                }
+            ],
+            "rows": []
         }
     ],
-    "block_slug": "sales-field-group"
+    "is_block": true,
+    "block_icon": "admin-post",
+    "block_description": "This to show sale numbers",
+    "block_category": "enterprise-cpt",
+    "block_slug": "sales-field-group",
+    "permissions": {
+        "minimum_role": "any",
+        "custom_capability": "",
+        "read_only": false
+    },
+    "locations": [
+        {
+            "type": "post_type",
+            "values": [
+                "post"
+            ]
+        }
+    ]
 }

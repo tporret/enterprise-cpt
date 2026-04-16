@@ -1,0 +1,47 @@
+# Exclude development and tooling files from WordPress.org distribution
+# Keep runtime plugin files and generated build assets.
+.git/
+.github/
+dist/
+node_modules/
+vendor/
+tests/
+test/
+assets/src/
+
+# Development tooling and config
+.editorconfig
+.eslintrc*
+.prettierrc*
+.stylelintrc*
+.phpcs.xml*
+.phpunit.xml*
+webpack.config.*
+vite.config.*
+rollup.config.*
+gulpfile.*
+Gruntfile.*
+package.json
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+bun.lockb
+composer.json
+composer.lock
+.php-version
+.nvmrc
+.node-version
+
+# Local and OS artifacts
+*.log
+*.tmp
+*.temp
+.cache/
+.DS_Store
+Thumbs.db
+
+# Git and distribution metadata
+.gitignore
+.gitattributes
+.distignore
+README.md

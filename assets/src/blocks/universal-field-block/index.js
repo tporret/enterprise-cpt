@@ -95,6 +95,7 @@ function normalizeBlockAttributeDefault(field) {
     });
 
     registerBlockType(blockName, {
+        apiVersion: 3,
         title: group.title || groupSlug,
         category: group.block_category || 'enterprise-cpt',
         icon: group.block_icon || 'screenoptions',

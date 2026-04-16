@@ -29,7 +29,7 @@ final class BlockRendererController
             self::NAMESPACE,
             '/render-block',
             [
-                'methods'             => 'GET',
+                'methods'             => [\WP_REST_Server::READABLE, \WP_REST_Server::CREATABLE],
                 'callback'            => [$this, 'render_block'],
                 'permission_callback' => [$this, 'can_edit'],
                 'args'                => [
@@ -39,9 +39,10 @@ final class BlockRendererController
                         'sanitize_callback' => 'sanitize_key',
                     ],
                     'attributes' => [
-                        'required' => false,
-                        'type'     => 'string',
-                        'default'  => '{}',
+                        'required'          => false,
+                        'type'              => 'object',
+                        'default'           => [],
+                        'sanitize_callback' => static fn ($value) => is_string($value) ? (json_decode($value, true) ?: []) : $value,
                     ],
                 ],
             ]
@@ -56,7 +57,7 @@ final class BlockRendererController
     public function render_block(WP_REST_Request $request): WP_REST_Response|WP_Error
     {
         $blockName  = sanitize_key($request->get_param('block_name'));
-        $attributes = json_decode($request->get_param('attributes'), true);
+        $attributes = $request->get_param('attributes');
 
         if (! is_array($attributes)) {
             $attributes = [];

@@ -51,6 +51,11 @@ wp-config-sample.php
 *.temp
 .cache/
 
+# Distribution artifacts
+/dist/
+*.zip
+*.sha256
+
 # Package manager lock files (decide based on your workflow)
 # composer.lock  # Uncomment if you want developers to pin versions
 # package-lock.json  # Uncomment if you want developers to pin versions

@@ -54,6 +54,14 @@ final class FieldGroupController
                 'methods' => 'DELETE',
                 'callback' => [$this, 'delete_item'],
                 'permission_callback' => [$this, 'can_manage'],
+                'args' => [
+                    'slug' => [
+                        'required' => true,
+                        'type' => 'string',
+                        'sanitize_callback' => 'sanitize_key',
+                        'validate_callback' => static fn ($value): bool => is_string($value) && $value !== '',
+                    ],
+                ],
             ]
         );
 
@@ -61,9 +69,23 @@ final class FieldGroupController
             self::NAMESPACE,
             '/field-groups/save',
             [
-                'methods' => 'POST',
+                'methods' => \WP_REST_Server::EDITABLE,
                 'callback' => [$this, 'save_item'],
                 'permission_callback' => [$this, 'can_manage'],
+                'args' => [
+                    'slug' => [
+                        'required' => true,
+                        'type' => 'string',
+                        'sanitize_callback' => 'sanitize_key',
+                        'validate_callback' => static fn ($value): bool => is_string($value) && $value !== '',
+                    ],
+                    'definition' => [
+                        'required' => true,
+                        'type' => 'array',
+                        'sanitize_callback' => static fn ($value) => is_array($value) ? $value : [],
+                        'validate_callback' => static fn ($value): bool => is_array($value),
+                    ],
+                ],
             ]
         );
 
@@ -71,9 +93,17 @@ final class FieldGroupController
             self::NAMESPACE,
             '/field-groups/reorder',
             [
-                'methods' => 'POST',
+                'methods' => \WP_REST_Server::EDITABLE,
                 'callback' => [$this, 'reorder_items'],
                 'permission_callback' => [$this, 'can_manage'],
+                'args' => [
+                    'slugs' => [
+                        'required' => true,
+                        'type' => 'array',
+                        'sanitize_callback' => static fn ($value) => is_array($value) ? array_map('sanitize_key', $value) : [],
+                        'validate_callback' => static fn ($value): bool => is_array($value) && array_reduce($value, static fn ($carry, $item) => $carry && is_string($item) && $item !== '', true),
+                    ],
+                ],
             ]
         );
 

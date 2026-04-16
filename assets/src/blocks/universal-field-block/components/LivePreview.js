@@ -8,7 +8,6 @@
 import { useState, useEffect, useRef, useCallback } from '@wordpress/element';
 import { Button, Spinner } from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
-import { addQueryArgs } from '@wordpress/url';
 
 const previewCache = new Map();
 
@@ -50,12 +49,17 @@ export default function LivePreview({
         setIsLoading(true);
         setError(null);
 
-        const path = addQueryArgs('/enterprise-cpt/v1/render-block', {
-            block_name: blockName,
-            attributes: attributesKey,
-        });
+        const path = '/enterprise-cpt/v1/render-block';
 
-        apiFetch({ path, signal: abortController?.signal })
+        apiFetch({
+            path,
+            method: 'POST',
+            data: {
+                block_name: blockName,
+                attributes,
+            },
+            signal: abortController?.signal,
+        })
             .then((response) => {
                 if (response.error) {
                     setError(response.error);
@@ -79,7 +83,7 @@ export default function LivePreview({
             .finally(() => {
                 setIsLoading(false);
             });
-    }, [attributesKey, blockName, cacheKey]);
+    }, [attributesKey, blockName, cacheKey, attributes]);
 
     // Debounce SSR requests. Site Editor uses a longer delay and pauses while editing.
     useEffect(() => {

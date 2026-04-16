@@ -1,0 +1,25 @@
+{
+    "slug": "product",
+    "name": "product",
+    "args": {
+        "label": "Products",
+        "labels": {
+            "name": "Products",
+            "singular_name": "Product",
+            "add_new_item": "Add New Product",
+            "edit_item": "Edit Product",
+            "new_item": "New Product",
+            "view_item": "View Product",
+            "search_items": "Search Products"
+        },
+        "public": true,
+        "show_in_rest": true,
+        "delete_with_user": false,
+        "supports": [
+            "title",
+            "editor",
+            "thumbnail"
+        ],
+        "enterprise_custom_table": false
+    }
+}

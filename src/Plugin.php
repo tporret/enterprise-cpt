@@ -207,10 +207,24 @@ final class Plugin
 
     public function blockEditorBootstrapData(): array
     {
-        $groups = $this->filterFieldGroupsForCurrentUser(
-            $this->fieldGroupDefinitions(),
-            get_current_user_id()
-        );
+        $postType = $this->resolveCurrentEditorPostType();
+
+        $context = [
+            'post_type' => $postType,
+            'user_role' => $this->getCurrentUserRoles(),
+        ];
+
+        $matchedGroupIds = $this->locationEvaluator->get_groups_for_context($context);
+        $definitions = $this->fieldGroupDefinitions();
+        $activeGroups = [];
+
+        foreach ($matchedGroupIds as $groupId) {
+            if (isset($definitions[$groupId])) {
+                $activeGroups[] = $definitions[$groupId];
+            }
+        }
+
+        $groups = $this->filterFieldGroupsForCurrentUser($activeGroups, get_current_user_id());
 
         $blockGroups = array_values(array_filter(
             $groups,
@@ -348,7 +362,7 @@ final class Plugin
 
         $categories[] = [
             'slug'  => 'enterprise-cpt',
-            'title' => 'Enterprise CPT',
+            'title' => esc_html__( 'Enterprise CPT', 'enterprise-cpt' ),
             'icon'  => null,
         ];
 
