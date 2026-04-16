@@ -1,0 +1,12 @@
+.editor-styles-wrapper .enterprise-cpt-block {
+  border-color: rgba(0, 0, 0, 0.08);
+  background: var(--wp-admin-theme-color-background, #f8f9fa);
+}
+
+.editor-styles-wrapper .enterprise-cpt-block__title {
+  color: var(--wp-admin-theme-color-primary, #111);
+}
+
+.editor-styles-wrapper .enterprise-cpt-block__field {
+  padding: 0.5rem 0;
+}

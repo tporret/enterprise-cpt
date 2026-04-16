@@ -1,0 +1,45 @@
+.enterprise-cpt-block {
+  border: 1px solid #dfe1e5;
+  border-radius: 6px;
+  background: #fff;
+  padding: 1rem;
+  margin: 0 0 1.5rem;
+}
+
+.enterprise-cpt-block__title {
+  margin: 0 0 0.75rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.enterprise-cpt-block__fields {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.enterprise-cpt-block__field {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.enterprise-cpt-block__label {
+  display: block;
+  font-size: 0.95rem;
+  color: #444;
+}
+
+.enterprise-cpt-block__value,
+.enterprise-cpt-block__repeater-value {
+  display: block;
+  color: #212529;
+}
+
+.enterprise-cpt-block__repeater-row {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.enterprise-cpt-block__repeater-column {
+  margin: 0 0 0.5rem;
+}

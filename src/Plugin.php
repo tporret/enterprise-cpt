@@ -322,12 +322,32 @@ final class Plugin
     {
         $scriptPath = ENTERPRISE_CPT_PATH . 'assets/build/blocks/blocks.js';
         $assetPath = ENTERPRISE_CPT_PATH . 'assets/build/blocks/blocks.asset.php';
+        $stylePath = ENTERPRISE_CPT_PATH . 'assets/blocks/style.css';
+        $editorStylePath = ENTERPRISE_CPT_PATH . 'assets/blocks/editor.css';
 
         if (! is_readable($scriptPath) || ! is_readable($assetPath)) {
             return;
         }
 
         $asset = require $assetPath;
+
+        if (is_readable($stylePath)) {
+            wp_register_style(
+                'enterprise-cpt-block-style',
+                ENTERPRISE_CPT_URL . 'assets/blocks/style.css',
+                [],
+                ENTERPRISE_CPT_VERSION
+            );
+        }
+
+        if (is_readable($editorStylePath)) {
+            wp_register_style(
+                'enterprise-cpt-block-editor-style',
+                ENTERPRISE_CPT_URL . 'assets/blocks/editor.css',
+                ['wp-edit-blocks'],
+                ENTERPRISE_CPT_VERSION
+            );
+        }
 
         wp_register_script(
             'enterprise-cpt-blocks',

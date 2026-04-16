@@ -92,6 +92,8 @@ final class BlockFactory
             ],
             'attributes'      => $attributes,
             'editor_script'   => 'enterprise-cpt-blocks',
+            'style'           => 'enterprise-cpt-block-style',
+            'editor_style'    => 'enterprise-cpt-block-editor-style',
             'render_callback' => fn(array $attrs, string $content) => Resolver::render_block($group, $attrs),
         ]);
     }
