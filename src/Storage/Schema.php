@@ -108,14 +108,22 @@ final class Schema
         return $tableName;
     }
 
-    /**
-     * Resolve the fully-qualified table name from the bare custom_table_name value.
-     */
-    public function get_table_name(string $customTableName): string
+    public static function resolve_table_name(string $customTableName): string
     {
         global $wpdb;
 
-        return $wpdb->prefix . sanitize_key($customTableName);
+        return $wpdb->prefix . 'enterprise_' . sanitize_key($customTableName);
+    }
+
+    /**
+     * Resolve the fully-qualified table name from the bare custom_table_name value.
+     *
+     * This method must match TableManager::tableName() semantics so the
+     * storage map and custom table DDL both use the same physical table name.
+     */
+    public function get_table_name(string $customTableName): string
+    {
+        return self::resolve_table_name($customTableName);
     }
 
     /**

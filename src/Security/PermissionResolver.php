@@ -6,12 +6,10 @@ namespace EnterpriseCPT\Security;
 
 use EnterpriseCPT\Engine\FieldGroups;
 
+use EnterpriseCPT\Security\AccessLevel;
+
 final class PermissionResolver
 {
-    public const ACCESS_FULL = 'full';
-    public const ACCESS_READ_ONLY = 'read_only';
-    public const ACCESS_NONE = 'none';
-
     private FieldGroups $fieldGroups;
 
     public function __construct(FieldGroups $fieldGroups)
@@ -19,18 +17,18 @@ final class PermissionResolver
         $this->fieldGroups = $fieldGroups;
     }
 
-    public function get_user_access_level(string $groupSlug, int $userId): string
+    public function get_user_access_level(string $groupSlug, int $userId): AccessLevel
     {
         $groupSlug = sanitize_key($groupSlug);
 
         if ($groupSlug === '') {
-            return self::ACCESS_NONE;
+            return AccessLevel::NONE;
         }
 
         $definition = $this->fieldGroups->definitions()[$groupSlug] ?? null;
 
         if (! is_array($definition)) {
-            return self::ACCESS_NONE;
+            return AccessLevel::NONE;
         }
 
         $permissions = is_array($definition['permissions'] ?? null)
@@ -43,23 +41,23 @@ final class PermissionResolver
 
         if ($customCapability !== '') {
             if (user_can($userId, $customCapability)) {
-                return self::ACCESS_FULL;
+                return AccessLevel::FULL;
             }
 
-            return $readOnly ? self::ACCESS_READ_ONLY : self::ACCESS_NONE;
+            return $readOnly ? AccessLevel::READ_ONLY : AccessLevel::NONE;
         }
 
         if ($this->meets_minimum_role($userId, $minimumRole)) {
-            return self::ACCESS_FULL;
+            return AccessLevel::FULL;
         }
 
-        return $readOnly ? self::ACCESS_READ_ONLY : self::ACCESS_NONE;
+        return $readOnly ? AccessLevel::READ_ONLY : AccessLevel::NONE;
     }
 
     /**
      * @param array<string, mixed> $definition
      */
-    public function get_definition_access_level(array $definition, int $userId): string
+    public function get_definition_access_level(array $definition, int $userId): AccessLevel
     {
         $groupSlug = sanitize_key((string) ($definition['name'] ?? ''));
 

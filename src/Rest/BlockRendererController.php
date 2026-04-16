@@ -14,6 +14,8 @@ final class BlockRendererController
 {
     private const NAMESPACE = 'enterprise-cpt/v1';
 
+    private const CACHE_GROUP = 'enterprise_cpt_block_render';
+
     private FieldGroups $fieldGroups;
 
     public function __construct(FieldGroups $fieldGroups)
@@ -60,6 +62,13 @@ final class BlockRendererController
             $attributes = [];
         }
 
+        $cacheKey = 'block_' . md5($blockName . ':' . wp_json_encode($attributes));
+        $cachedHtml = wp_cache_get($cacheKey, self::CACHE_GROUP);
+
+        if (is_string($cachedHtml)) {
+            return new WP_REST_Response(['html' => $cachedHtml], 200);
+        }
+
         // Find the field group definition so Resolver has full context.
         $group = null;
 
@@ -85,6 +94,7 @@ final class BlockRendererController
         }
 
         $html = Resolver::render_block($group, $attributes);
+        wp_cache_set($cacheKey, $html, self::CACHE_GROUP, MINUTE_IN_SECONDS);
 
         return new WP_REST_Response(['html' => $html], 200);
     }

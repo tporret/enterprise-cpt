@@ -28,10 +28,7 @@ final class TableManager
      */
     public function tableName(string $customTableName): string
     {
-        global $wpdb;
-        
-        // Use the current blog's prefix (e.g., wp_2_) instead of the global prefix
-        return $wpdb->prefix . 'enterprise_' . sanitize_key($customTableName);
+        return Schema::resolve_table_name($customTableName);
     }
 
     /**
@@ -39,8 +36,7 @@ final class TableManager
      */
     private function repeaterTableName(string $fieldSlug): string
     {
-        global $wpdb;
-        return $wpdb->prefix . 'enterprise_repeater_' . $fieldSlug;
+        return Schema::resolve_table_name('enterprise_repeater_' . $fieldSlug);
     }
 
     /**

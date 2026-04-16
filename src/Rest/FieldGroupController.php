@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace EnterpriseCPT\Rest;
 
 use EnterpriseCPT\Engine\FieldGroups;
+use EnterpriseCPT\Security\AccessLevel;
 use EnterpriseCPT\Security\PermissionResolver;
 use WP_Error;
 use WP_REST_Request;
@@ -130,7 +131,7 @@ final class FieldGroupController
 
             $accessLevel = $this->permissionResolver->get_user_access_level($slug, $userId);
 
-            if ($accessLevel === PermissionResolver::ACCESS_NONE) {
+            if ($accessLevel === AccessLevel::NONE) {
                 continue;
             }
 
@@ -143,7 +144,7 @@ final class FieldGroupController
                 'title' => (string) ($definition['title'] ?? $slug),
                 'locations' => $locationSummary,
                 'custom_table_status' => $hasCustomTable ? 'custom_table' : 'postmeta',
-                'readonly' => $accessLevel === PermissionResolver::ACCESS_READ_ONLY,
+                'readonly' => $accessLevel === AccessLevel::READ_ONLY,
             ];
         }
 
@@ -174,11 +175,11 @@ final class FieldGroupController
 
         $accessLevel = $this->permissionResolver->get_user_access_level($slug, get_current_user_id());
 
-        if ($accessLevel === PermissionResolver::ACCESS_NONE) {
+        if ($accessLevel === AccessLevel::NONE) {
             return new WP_Error('enterprise_cpt_field_group_not_found', 'Field group not found.', ['status' => 404]);
         }
 
-        if ($accessLevel === PermissionResolver::ACCESS_READ_ONLY) {
+        if ($accessLevel === AccessLevel::READ_ONLY) {
             $definition['readonly'] = true;
         }
 
@@ -374,11 +375,11 @@ final class FieldGroupController
 
             $accessLevel = $this->permissionResolver->get_user_access_level($slug, $userId);
 
-            if ($accessLevel === PermissionResolver::ACCESS_NONE) {
+            if ($accessLevel === AccessLevel::NONE) {
                 continue;
             }
 
-            if ($accessLevel === PermissionResolver::ACCESS_READ_ONLY) {
+            if ($accessLevel === AccessLevel::READ_ONLY) {
                 $group['readonly'] = true;
             }
 

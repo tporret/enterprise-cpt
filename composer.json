@@ -16,6 +16,7 @@
     }
   },
   "scripts": {
-    "verify-php": "find . -name '*.php' | xargs php -l"
+    "verify-php": "find . -name '*.php' | xargs php -l",
+    "schema:verify": "php tests/SchemaTableNameTest.php"
   }
 }

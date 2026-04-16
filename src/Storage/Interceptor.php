@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace EnterpriseCPT\Storage;
 
+use EnterpriseCPT\Security\AccessLevel;
 use EnterpriseCPT\Security\PermissionResolver;
 use WP_Error;
 
@@ -272,7 +273,7 @@ final class Interceptor
 
         $accessLevel = $this->permissionResolver->get_user_access_level($groupSlug, get_current_user_id());
 
-        if ($accessLevel === PermissionResolver::ACCESS_FULL) {
+        if ($accessLevel === AccessLevel::FULL) {
             return null;
         }
 

@@ -18,6 +18,7 @@ use EnterpriseCPT\Location\RuleFactory;
 use EnterpriseCPT\Rest\BlockRendererController;
 use EnterpriseCPT\Rest\CPTController;
 use EnterpriseCPT\Rest\FieldGroupController;
+use EnterpriseCPT\Security\AccessLevel;
 use EnterpriseCPT\Security\PermissionResolver;
 use EnterpriseCPT\Storage\Hydrator;
 use EnterpriseCPT\Storage\Interceptor;
@@ -964,11 +965,11 @@ final class Plugin
 
             $accessLevel = $this->permissionResolver->get_definition_access_level($group, $userId);
 
-            if ($accessLevel === PermissionResolver::ACCESS_NONE) {
+            if ($accessLevel === AccessLevel::NONE) {
                 continue;
             }
 
-            if ($accessLevel === PermissionResolver::ACCESS_READ_ONLY) {
+            if ($accessLevel === AccessLevel::READ_ONLY) {
                 $group['readonly'] = true;
             }
 
@@ -996,7 +997,7 @@ final class Plugin
 
             $accessLevel = $this->permissionResolver->get_user_access_level($groupSlug, $userId);
 
-            if ($accessLevel !== PermissionResolver::ACCESS_NONE) {
+            if ($accessLevel !== AccessLevel::NONE) {
                 continue;
             }
 
