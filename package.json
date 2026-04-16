@@ -1,6 +1,6 @@
 {
   "name": "enterprise-cpt",
-  "version": "0.1.0",
+  "version": "0.5.1",
   "private": true,
   "scripts": {
     "build": "npm run build:index && npm run build:editor && npm run build:cpt-manager && npm run build:blocks",

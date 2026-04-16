@@ -5,7 +5,7 @@ Tags: custom post type, custom fields, gutenberg, metadata, performance
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 8.3
-Stable tag: 0.1.0
+Stable tag: 0.5.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 

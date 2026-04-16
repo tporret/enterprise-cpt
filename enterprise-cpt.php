@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Enterprise CPT
  * Description: JSON-first custom post types and field registration for enterprise WordPress data models.
- * Version: 0.1.0
+ * Version: 0.5.1
  * Requires PHP: 8.3
  * Tested up to: 6.9
  * Author: tporret
@@ -15,7 +15,7 @@ if (! defined('ABSPATH')) {
     exit;
 }
 
-define('ENTERPRISE_CPT_VERSION', '0.1.0');
+define('ENTERPRISE_CPT_VERSION', '0.5.1');
 define('ENTERPRISE_CPT_FILE', __FILE__);
 define('ENTERPRISE_CPT_PATH', plugin_dir_path(__FILE__));
 define('ENTERPRISE_CPT_URL', plugin_dir_url(__FILE__));
