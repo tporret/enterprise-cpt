@@ -12,6 +12,7 @@ import {
     TextareaControl,
     ToggleControl,
 } from '@wordpress/components';
+import '../common/admin-style.css';
 import { Fragment, render, useEffect, useMemo, useState } from '@wordpress/element';
 import {
     FIELD_SETTINGS_COMPONENTS,
@@ -54,26 +55,26 @@ function FieldGroupList({ items, loading, onAddNew, onEdit, onDelete, onMoveUp, 
     return (
         <Card>
             <CardBody>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <div className="enterprise-cpt-card-header">
                     <div>
-                        <h1 style={{ margin: 0 }}>Field Groups</h1>
-                        <p style={{ margin: '6px 0 0', color: '#50575e' }}>Manage schemas, locations, and storage mode.</p>
+                        <h1 className="enterprise-cpt-heading">Field Groups</h1>
+                        <p className="enterprise-cpt-subheading">Manage schemas, locations, and storage mode.</p>
                     </div>
-                    <Button variant="primary" onClick={onAddNew}>Add New</Button>
+                    <Button variant="primary" className="enterprise-cpt-button--primary" onClick={onAddNew}>Add New</Button>
                 </div>
 
                 {loading ? (
-                    <div style={{ padding: 16 }}><Spinner /></div>
+                    <div className="enterprise-cpt-spinner-wrapper"><Spinner /></div>
                 ) : (
                     <table className="widefat striped">
                         <thead>
                             <tr>
-                                <th style={{ width: 60 }}></th>
+                                <th className="enterprise-cpt-table-cell--narrow"></th>
                                 <th>Title</th>
                                 <th>Name (Slug)</th>
                                 <th>Locations</th>
                                 <th>Storage</th>
-                                <th style={{ width: 200 }}>Actions</th>
+                                <th className="enterprise-cpt-table-cell--wide">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -87,15 +88,15 @@ function FieldGroupList({ items, loading, onAddNew, onEdit, onDelete, onMoveUp, 
 
                                 return (
                                     <tr key={item.slug}>
-                                        <td style={{ textAlign: 'center', padding: '8px 4px' }}>
-                                            <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                                        <td className="enterprise-cpt-table-cell enterprise-cpt-table-cell--centered">
+                                            <div className="enterprise-cpt-table-actions">
                                                 <Button
                                                     isSmall
                                                     variant="tertiary"
                                                     onClick={() => onMoveUp(index)}
                                                     disabled={!canMoveUp}
                                                     title="Move up"
-                                                    style={{ minHeight: 'unset', padding: '2px 6px', fontSize: 12 }}
+                                                    className="enterprise-cpt-small-button"
                                                 >
                                                     ↑
                                                 </Button>
@@ -105,7 +106,7 @@ function FieldGroupList({ items, loading, onAddNew, onEdit, onDelete, onMoveUp, 
                                                     onClick={() => onMoveDown(index)}
                                                     disabled={!canMoveDown}
                                                     title="Move down"
-                                                    style={{ minHeight: 'unset', padding: '2px 6px', fontSize: 12 }}
+                                                    className="enterprise-cpt-small-button"
                                                 >
                                                     ↓
                                                 </Button>
@@ -115,21 +116,12 @@ function FieldGroupList({ items, loading, onAddNew, onEdit, onDelete, onMoveUp, 
                                         <td><code>{item.slug}</code></td>
                                         <td>{item.locations}</td>
                                         <td>
-                                            <span
-                                                style={{
-                                                    display: 'inline-block',
-                                                    padding: '2px 8px',
-                                                    borderRadius: 999,
-                                                    fontSize: 12,
-                                                    background: isCustomTable ? '#e7f7ed' : '#f0f0f1',
-                                                    color: '#1d2327',
-                                                }}
-                                            >
+                                            <span className={`enterprise-cpt-pill ${isCustomTable ? 'enterprise-cpt-pill--positive' : 'enterprise-cpt-pill--muted'}`}>
                                                 {isCustomTable ? 'Custom Table' : 'Postmeta'}
                                             </span>
                                         </td>
                                         <td>
-                                            <div style={{ display: 'flex', gap: 8 }}>
+                                            <div className="enterprise-cpt-table-actions">
                                                 <Button variant="secondary" onClick={() => onEdit(item.slug)}>Edit</Button>
                                                 <Button variant="tertiary" isDestructive onClick={() => onDelete(item.slug)}>
                                                     Delete
@@ -150,12 +142,12 @@ function FieldGroupList({ items, loading, onAddNew, onEdit, onDelete, onMoveUp, 
 
 function HeaderBar({ title, isSaving, onBack, onSave, onExport }) {
     return (
-        <div className="enterprise-cpt-header" style={{ marginBottom: 12 }}>
+        <div className="enterprise-cpt-header enterprise-cpt-header--spaced">
             <div>
-                <h1 style={{ marginBottom: 4 }}>{title}</h1>
-                <p style={{ marginTop: 0 }}>Edit field schema and save to JSON/DB buffer.</p>
+                <h1 className="enterprise-cpt-heading enterprise-cpt-heading--page">{title}</h1>
+                <p className="enterprise-cpt-subheading">Edit field schema and save to JSON/DB buffer.</p>
             </div>
-            <div className="enterprise-cpt-header__actions" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <div className="enterprise-cpt-header__actions">
                 <Button variant="secondary" onClick={onBack}>Back to Field Groups</Button>
                 <Button variant="secondary" onClick={onExport}>Export JSON</Button>
                 <Button variant="primary" onClick={onSave} isBusy={isSaving}>Save</Button>
@@ -214,22 +206,13 @@ function LocationRulesPanel({ group, onGroupChange, locationOptions, loading }) 
         const selectedValues = getSelectedValues(type);
 
         return (
-            <div style={{ marginTop: 12 }}>
-                <label style={{ display: 'block', marginBottom: 8, fontWeight: 500 }}>{label}</label>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            <div className="enterprise-cpt-option-group">
+                <label className="enterprise-cpt-option-group__label">{label}</label>
+                <div className="enterprise-cpt-option-grid">
                     {options.map((option) => (
                         <label
                             key={`${type}-${option.value}`}
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 6,
-                                padding: '6px 12px',
-                                border: '1px solid #ddd',
-                                borderRadius: 4,
-                                cursor: 'pointer',
-                                background: selectedValues.includes(option.value) ? '#f0f6fc' : '#fff',
-                            }}
+                            className={`enterprise-cpt-location-option ${selectedValues.includes(option.value) ? 'enterprise-cpt-location-option--selected' : ''}`}
                         >
                             <input
                                 type="checkbox"
@@ -495,12 +478,12 @@ function MainCanvas({ group, activeFieldIndex, setActiveFieldIndex, onGroupChang
 
     return (
         <main className="enterprise-cpt-canvas">
-            <div className="enterprise-cpt-canvas__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="enterprise-cpt-canvas__header">
                 <div>
-                    <h2 style={{ marginBottom: 4 }}>{group.title || 'Untitled Field Group'}</h2>
-                    <p style={{ marginTop: 0 }}>Manage fields and ordering for this group.</p>
+                    <h2 className="enterprise-cpt-heading enterprise-cpt-heading--section">{group.title || 'Untitled Field Group'}</h2>
+                    <p className="enterprise-cpt-subheading">Manage fields and ordering for this group.</p>
                 </div>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'end' }}>
+                <div className="enterprise-cpt-canvas__header-actions">
                     <SelectControl
                 __next40pxDefaultSize
                 __nextHasNoMarginBottom
@@ -513,25 +496,25 @@ function MainCanvas({ group, activeFieldIndex, setActiveFieldIndex, onGroupChang
                 </div>
             </div>
 
-            <div className="enterprise-cpt-field-list" style={{ display: 'grid', gap: 12 }}>
+            <div className="enterprise-cpt-field-list">
                 {fields.map((field, index) => (
                     <Card
                         key={`${field.name}-${index}`}
                         onClick={() => setActiveFieldIndex(index)}
-                        style={{ cursor: 'pointer', borderColor: activeFieldIndex === index ? '#2271b1' : undefined }}
+                        className={`enterprise-cpt-field-card ${activeFieldIndex === index ? 'enterprise-cpt-field-card--active' : ''}`}
                     >
                         <CardBody>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div className="enterprise-cpt-field-card__row">
                                 <strong>{field.label || `Field ${index + 1}`}</strong>
-                                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                                    <span style={{ fontSize: 12, opacity: 0.7 }}>{field.type}</span>
+                                <div className="enterprise-cpt-field-card__actions">
+                                    <span className="enterprise-cpt-field-card__type">{field.type}</span>
                                     <Button
                                         variant="tertiary"
                                         isSmall
                                         onClick={(e) => moveFieldUp(index, e)}
                                         disabled={index <= 0}
                                         title="Move field up"
-                                        style={{ minHeight: 'unset', padding: '2px 6px', fontSize: 12 }}
+                                        className="enterprise-cpt-small-button"
                                     >
                                         ↑
                                     </Button>
@@ -541,7 +524,7 @@ function MainCanvas({ group, activeFieldIndex, setActiveFieldIndex, onGroupChang
                                         onClick={(e) => moveFieldDown(index, e)}
                                         disabled={index >= fields.length - 1}
                                         title="Move field down"
-                                        style={{ minHeight: 'unset', padding: '2px 6px', fontSize: 12 }}
+                                        className="enterprise-cpt-small-button"
                                     >
                                         ↓
                                     </Button>
@@ -550,13 +533,13 @@ function MainCanvas({ group, activeFieldIndex, setActiveFieldIndex, onGroupChang
                                         isDestructive
                                         isSmall
                                         onClick={(e) => deleteField(index, e)}
-                                        style={{ minHeight: 'unset', padding: '2px 8px' }}
+                                        className="enterprise-cpt-small-button enterprise-cpt-small-button--destructive"
                                     >
                                         Remove
                                     </Button>
                                 </div>
                             </div>
-                            <div style={{ marginTop: 8, fontSize: 12, opacity: 0.8 }}>
+                            <div className="enterprise-cpt-field-card__meta">
                                 <code>{field.name || ''}</code>
                             </div>
                         </CardBody>
@@ -804,7 +787,7 @@ function App() {
             {currentView === 'editor' ? (
                 <Fragment>
                     {editorLoading ? (
-                        <div style={{ padding: 16 }}><Spinner /></div>
+                        <div className="enterprise-cpt-spinner-wrapper"><Spinner /></div>
                     ) : (
                         <Fragment>
                             <HeaderBar
@@ -814,7 +797,7 @@ function App() {
                                 onSave={saveGroup}
                                 onExport={onExport}
                             />
-                            <div className="enterprise-cpt-shell" style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 16 }}>
+                            <div className="enterprise-cpt-shell">
                                 <Sidebar
                                     group={activeGroup}
                                     activeFieldIndex={activeFieldIndex}
@@ -836,10 +819,7 @@ function App() {
             ) : null}
 
             {snacks.length ? (
-                <div
-                    className="enterprise-cpt-snackbar"
-                    style={{ position: 'fixed', right: 20, bottom: 20, zIndex: 9999, width: 340, display: 'grid', gap: 8 }}
-                >
+                <div className="enterprise-cpt-snackbar">
                     {snacks.map((snack) => (
                         <Notice
                             key={snack.id}

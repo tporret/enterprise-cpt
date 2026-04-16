@@ -10,6 +10,7 @@ import { useDispatch, useSelect } from '@wordpress/data';
 import { PluginDocumentSettingPanel } from '@wordpress/edit-post';
 import { Fragment } from '@wordpress/element';
 import { registerPlugin } from '@wordpress/plugins';
+import '../common/admin-style.css';
 import RepeaterField from '../editor/fields/RepeaterField';
 
 const config = window.enterpriseCptEditor || { groups: [] };
@@ -122,14 +123,14 @@ function FieldRenderer({ field, value, onChange }) {
 
     if (type === 'true_false') {
         return (
-            <div style={{ marginBottom: 16 }}>
+            <div className="enterprise-cpt-toggle-field">
                 <ToggleControl
                     label={field.label}
                     help={field.help || undefined}
                     checked={Boolean(value)}
                     onChange={(checked) => onChange(Boolean(checked))}
                 />
-                <div style={{ fontSize: 12, color: '#50575e', marginTop: 4 }}>
+                <div className="enterprise-cpt-toggle-field__help">
                     {`${field.on_text || 'On'} / ${field.off_text || 'Off'}`}
                 </div>
             </div>

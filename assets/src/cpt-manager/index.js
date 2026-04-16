@@ -11,6 +11,7 @@ import {
     TextControl,
     ToggleControl,
 } from '@wordpress/components';
+import '../common/admin-style.css';
 import { render, useEffect, useMemo, useState } from '@wordpress/element';
 import apiFetch from '@wordpress/api-fetch';
 
@@ -219,9 +220,9 @@ function CptManagerApp() {
     };
 
     return (
-        <div style={{ marginTop: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                <h1 style={{ margin: 0 }}>CPT Manager</h1>
+        <div className="enterprise-cpt-page enterprise-cpt-page--spaced">
+            <div className="enterprise-cpt-page__header">
+                <h1 className="enterprise-cpt-heading">CPT Manager</h1>
                 <Button variant="primary" onClick={onNew}>Add New</Button>
             </div>
 
@@ -231,7 +232,7 @@ function CptManagerApp() {
                 </Notice>
             )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: 16 }}>
+            <div className="enterprise-cpt-page__grid">
                 <Card>
                     <CardHeader>
                         <strong>Registered Post Types</strong>
@@ -258,7 +259,7 @@ function CptManagerApp() {
                                         <tr key={item.slug}>
                                             <td><code>{item.slug}</code></td>
                                             <td>{item.source}</td>
-                                            <td style={{ textAlign: 'right' }}>
+                                            <td className="enterprise-cpt-table-cell enterprise-cpt-table-cell--right">
                                                 <Button
                                                     variant={selectedSlug === item.slug ? 'primary' : 'secondary'}
                                                     onClick={() => selectItem(item)}
@@ -279,7 +280,7 @@ function CptManagerApp() {
                         <strong>{selectedItem ? `Edit ${selectedItem.slug}` : 'Create New CPT'}</strong>
                     </CardHeader>
                     <CardBody>
-                        <div style={{ display: 'grid', gap: 12 }}>
+                        <div className="enterprise-cpt-form-grid">
                             <TextControl
                                 __next40pxDefaultSize
                                 __nextHasNoMarginBottom
@@ -314,7 +315,7 @@ function CptManagerApp() {
 
                         <Panel>
                             <PanelBody title="Supports" initialOpen>
-                                <div style={{ display: 'grid', gap: 8 }}>
+                                <div className="enterprise-cpt-panel-grid">
                                     {SUPPORT_OPTIONS.map((option) => (
                                         <CheckboxControl
                                             __nextHasNoMarginBottom
@@ -327,7 +328,7 @@ function CptManagerApp() {
                                 </div>
                             </PanelBody>
                             <PanelBody title="Enterprise Features" initialOpen>
-                                <div style={{ display: 'grid', gap: 8 }}>
+                                <div className="enterprise-cpt-panel-grid">
                                     <ToggleControl
                                         __nextHasNoMarginBottom
                                         label="Enable Custom Table Engine for this CPT"
@@ -338,7 +339,7 @@ function CptManagerApp() {
                             </PanelBody>
                         </Panel>
 
-                        <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end' }}>
+                        <div className="enterprise-cpt-form-actions">
                             <Button variant="primary" onClick={onSave} disabled={isSaving}>
                                 {isSaving ? 'Saving…' : 'Save CPT'}
                             </Button>

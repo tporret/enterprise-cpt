@@ -118,32 +118,24 @@ export default function LivePreview({
 
     if (error && isSiteEditor) {
         return (
-            <div
-                className="enterprise-cpt-live-preview enterprise-cpt-live-preview--fallback"
-                style={{
-                    border: '1px solid #dcdcde',
-                    borderRadius: 2,
-                    background: '#fff',
-                    padding: 12,
-                }}
-            >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                    <strong style={{ fontSize: 13 }}>Site Editor fallback preview</strong>
+            <div className="enterprise-cpt-live-preview enterprise-cpt-live-preview--fallback">
+                <div className="enterprise-cpt-live-preview__header">
+                    <strong className="enterprise-cpt-live-preview__title">Site Editor fallback preview</strong>
                     <Button variant="secondary" isSmall onClick={refreshPreview}>
                         Refresh Preview
                     </Button>
                 </div>
-                <p style={{ marginTop: 8, marginBottom: 10, fontSize: 12, color: '#50575e' }}>
+                <p className="enterprise-cpt-live-preview__message">
                     Live SSR preview is temporarily unavailable while editing. Showing field summary.
                 </p>
                 {fallbackSummary.length > 0 ? (
-                    <ul style={{ margin: 0, paddingLeft: 16, fontSize: 13, color: '#1e1e1e' }}>
+                    <ul className="enterprise-cpt-live-preview__list">
                         {fallbackSummary.map((item, i) => (
                             <li key={i}>{item}</li>
                         ))}
                     </ul>
                 ) : (
-                    <p style={{ margin: 0, fontSize: 13, color: '#1e1e1e' }}>No field values entered yet.</p>
+                    <p className="enterprise-cpt-live-preview__empty">No field values entered yet.</p>
                 )}
             </div>
         );
@@ -151,17 +143,7 @@ export default function LivePreview({
 
     if (isLoading) {
         return (
-            <div
-                className="enterprise-cpt-live-preview enterprise-cpt-live-preview--loading"
-                style={{
-                    position: 'relative',
-                    minHeight: 60,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    opacity: 0.6,
-                }}
-            >
+            <div className="enterprise-cpt-live-preview enterprise-cpt-live-preview--loading">
                 <Spinner />
             </div>
         );
@@ -169,17 +151,7 @@ export default function LivePreview({
 
     if (error) {
         return (
-            <div
-                className="enterprise-cpt-live-preview enterprise-cpt-live-preview--error"
-                style={{
-                    padding: 12,
-                    background: '#fcf0f0',
-                    border: '1px solid #d63638',
-                    borderRadius: 2,
-                    fontSize: 13,
-                    color: '#8a1116',
-                }}
-            >
+            <div className="enterprise-cpt-live-preview enterprise-cpt-live-preview--error">
                 {error}
             </div>
         );
@@ -188,7 +160,7 @@ export default function LivePreview({
     return (
         <div className="enterprise-cpt-live-preview-wrap">
             {isSiteEditor && (
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+                <div className="enterprise-cpt-live-preview__actions">
                     <Button variant="secondary" isSmall onClick={refreshPreview}>
                         Refresh Preview
                     </Button>

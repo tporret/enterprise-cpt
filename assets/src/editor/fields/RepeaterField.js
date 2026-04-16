@@ -102,14 +102,7 @@ function ImagePreview({ attachmentId }) {
         <img
             src={src}
             alt=""
-            style={{
-                display: 'block',
-                maxWidth: '100%',
-                maxHeight: 200,
-                objectFit: 'contain',
-                borderRadius: 4,
-                marginTop: 4,
-            }}
+            className="enterprise-cpt-image-preview"
         />
     );
 }
@@ -178,19 +171,12 @@ function SubfieldInput({ subfield, value, onChange, disabled = false }) {
         };
 
         return (
-            <div style={{ marginBottom: 16 }}>
-                <p
-                    style={{
-                        fontWeight: 600,
-                        fontSize: 11,
-                        textTransform: 'uppercase',
-                        marginBottom: 4,
-                    }}
-                >
+            <div className="enterprise-cpt-image-input">
+                <p className="enterprise-cpt-image-input__label">
                     {subfield.label || subfield.name}
                 </p>
                 <ImagePreview attachmentId={attachmentId} />
-                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <div className="enterprise-cpt-image-input__actions">
                     <Button variant="secondary" isSmall disabled={disabled} onClick={openMedia}>
                         {attachmentId ? 'Replace Image' : 'Select Image'}
                     </Button>
@@ -417,18 +403,11 @@ export default function RepeaterField({ field, value, onChange, disabled = false
     // ── render ───────────────────────────────────────────────────────────
 
     return (
-        <div style={{ marginBottom: 16 }}>
+        <div className="enterprise-cpt-repeater">
             {/* Header */}
-            <div
-                style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    marginBottom: 8,
-                }}
-            >
-                <p style={{ fontWeight: 600, margin: 0 }}>{field.label}</p>
-                <div style={{ display: 'flex', gap: 8 }}>
+            <div className="enterprise-cpt-repeater__header">
+                <p className="enterprise-cpt-repeater__title">{field.label}</p>
+                <div className="enterprise-cpt-repeater__header-actions">
                     <Button variant="primary" isSmall disabled={disabled} onClick={addRow}>
                         + Add Row
                     </Button>
@@ -446,24 +425,18 @@ export default function RepeaterField({ field, value, onChange, disabled = false
             </div>
 
             {field.help && (
-                <p style={{ fontSize: 12, color: '#50575e', marginTop: 0 }}>
+                <p className="enterprise-cpt-field-help">
                     {field.help}
                 </p>
             )}
 
             {/* List Mode */}
             {rows.length === 0 ? (
-                <p
-                    style={{
-                        fontSize: 12,
-                        color: '#50575e',
-                        fontStyle: 'italic',
-                    }}
-                >
+                <p className="enterprise-cpt-repeater__empty-state">
                     No rows yet.
                 </p>
             ) : (
-                <div style={{ display: 'grid', gap: 4 }}>
+                <div className="enterprise-cpt-repeater__list">
                     {rows.map((row, idx) => (
                         <div
                             key={idx}
@@ -472,62 +445,28 @@ export default function RepeaterField({ field, value, onChange, disabled = false
                             onDragEnter={() => handleDragEnter(idx)}
                             onDragEnd={handleDragEnd}
                             onDragOver={(e) => e.preventDefault()}
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 8,
-                                padding: '8px 12px',
-                                border:
-                                    dragOverIndex === idx
-                                        ? '2px solid #007cba'
-                                        : '1px solid #ddd',
-                                borderRadius: 4,
-                                background:
-                                    dragOverIndex === idx
-                                        ? '#f0f6fc'
-                                        : '#fafafa',
-                                cursor: disabled ? 'default' : 'grab',
-                                opacity:
-                                    dragItem.current === idx ? 0.5 : 1,
-                                transition:
-                                    'border-color 0.15s, background 0.15s',
-                            }}
+                            className={`enterprise-cpt-repeater-row ${dragOverIndex === idx ? 'enterprise-cpt-repeater-row--drag-over' : ''} ${disabled ? 'enterprise-cpt-repeater-row--disabled' : ''} ${dragItem.current === idx ? 'enterprise-cpt-repeater-row--dragging' : ''}`}
                         >
                             {/* Drag handle */}
-                            <span
-                                style={{
-                                    display: 'flex',
-                                    color: '#999',
-                                    cursor: disabled ? 'default' : 'grab',
-                                }}
-                            >
+                            <span className="enterprise-cpt-repeater-handle">
                                 <Button
                                     icon={dragHandle}
                                     label="Drag to reorder"
                                     isSmall
                                     disabled={disabled}
-                                    style={{
-                                        cursor: disabled ? 'default' : 'grab',
-                                        minWidth: 0,
-                                        padding: 0,
-                                    }}
+                                    className="enterprise-cpt-repeater-handle__button"
                                 />
                             </span>
 
                             {/* Summary */}
-                            <div style={{ flex: 1 }}>
-                                <span
-                                    style={{
-                                        fontSize: 13,
-                                        fontWeight: 500,
-                                    }}
-                                >
+                            <div className="enterprise-cpt-repeater-row__summary-wrapper">
+                                <span className="enterprise-cpt-repeater-row__summary">
                                     {rowSummary(row)}
                                 </span>
                             </div>
 
                             {/* Actions: Edit / Clone / Delete */}
-                            <div style={{ display: 'flex', gap: 4 }}>
+                            <div className="enterprise-cpt-repeater-row__actions">
                                 <Button
                                     icon={pencil}
                                     label="Edit"
@@ -570,7 +509,7 @@ export default function RepeaterField({ field, value, onChange, disabled = false
                     title={`Editing ${rowSummary(rows[focusedIndex])}`}
                     onRequestClose={closeFocus}
                 >
-                    <div style={{ minWidth: 480 }}>
+                    <div className="enterprise-cpt-repeater-modal__content">
                         {schema.map((col) => (
                             <SubfieldInput
                                 key={col.name}
@@ -585,16 +524,7 @@ export default function RepeaterField({ field, value, onChange, disabled = false
                     </div>
 
                     {/* Footer: Discard / Done */}
-                    <div
-                        style={{
-                            display: 'flex',
-                            justifyContent: 'flex-end',
-                            gap: 8,
-                            marginTop: 24,
-                            paddingTop: 16,
-                            borderTop: '1px solid #ddd',
-                        }}
-                    >
+                    <div className="enterprise-cpt-repeater-modal__footer">
                         {!disabled && (
                             <Button variant="tertiary" onClick={discardChanges}>
                                 Discard Changes

@@ -10,3 +10,150 @@
 .editor-styles-wrapper .enterprise-cpt-block__field {
   padding: 0.5rem 0;
 }
+
+.enterprise-cpt-field-toggle {
+  margin-bottom: 16px;
+}
+
+.enterprise-cpt-field-toggle__help {
+  font-size: 12px;
+  color: #50575e;
+  margin-top: 4px;
+}
+
+.enterprise-cpt-field-image {
+  margin-bottom: 16px;
+}
+
+.enterprise-cpt-field-image__label {
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.enterprise-cpt-field-image__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.enterprise-cpt-field-image__meta {
+  font-size: 12px;
+  color: #757575;
+  margin-top: 4px;
+}
+
+.enterprise-cpt-block-preview {
+  border: 1px solid var(--wp-admin-theme-color, #007cba);
+  border-radius: 2px;
+  background: var(--wp-admin-theme-color-darker-10, #fafafa);
+  overflow: hidden;
+}
+
+.enterprise-cpt-block-preview__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.enterprise-cpt-block-preview__header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.enterprise-cpt-block-preview__icon {
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+  color: var(--wp-admin-theme-color, #007cba);
+}
+
+.enterprise-cpt-block-preview__title {
+  font-size: 14px;
+}
+
+.enterprise-cpt-block-modal {
+  min-width: 480px;
+}
+
+.enterprise-cpt-block-modal__alert {
+  margin-top: 0;
+  margin-bottom: 16px;
+  padding: 10px;
+  background: #f0f6fc;
+  border: 1px solid #c3dcf6;
+  border-radius: 2px;
+}
+
+.enterprise-cpt-block-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid #ddd;
+}
+
+.enterprise-cpt-live-preview--fallback {
+  border: 1px solid #dcdcde;
+  border-radius: 2px;
+  background: #fff;
+  padding: 12px;
+}
+
+.enterprise-cpt-live-preview__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.enterprise-cpt-live-preview__title {
+  font-size: 13px;
+}
+
+.enterprise-cpt-live-preview__message {
+  margin-top: 8px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: #50575e;
+}
+
+.enterprise-cpt-live-preview__list {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 13px;
+  color: #1e1e1e;
+}
+
+.enterprise-cpt-live-preview__empty {
+  margin: 0;
+  font-size: 13px;
+  color: #1e1e1e;
+}
+
+.enterprise-cpt-live-preview--loading {
+  position: relative;
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.6;
+}
+
+.enterprise-cpt-live-preview--error {
+  padding: 12px;
+  background: #fcf0f0;
+  border: 1px solid #d63638;
+  border-radius: 2px;
+  font-size: 13px;
+  color: #8a1116;
+}
+
+.enterprise-cpt-live-preview__actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}

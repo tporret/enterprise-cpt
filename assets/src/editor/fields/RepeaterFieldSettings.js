@@ -40,18 +40,12 @@ export default function RepeaterFieldSettings({ field, onChange }) {
 
     return (
         <div>
-            <p style={{ fontWeight: 600, marginBottom: 8 }}>Sub Fields</p>
+            <p className="enterprise-cpt-section-heading">Sub Fields</p>
 
             {rows.map((row, idx) => (
                 <div
                     key={idx}
-                    style={{
-                        border: '1px solid #ddd',
-                        borderRadius: 4,
-                        padding: 8,
-                        marginBottom: 8,
-                        background: '#f9f9f9',
-                    }}
+                    className="enterprise-cpt-subfield-card"
                 >
                     <TextControl
             __next40pxDefaultSize

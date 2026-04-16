@@ -186,7 +186,7 @@ function SubfieldRenderer({ field, value, onChange, disabled = false }) {
 
     if (type === 'true_false') {
         return (
-            <div style={{ marginBottom: 16 }}>
+            <div className="enterprise-cpt-field-toggle">
                 <ToggleControl
                     label={field.label}
                     help={field.help || undefined}
@@ -194,7 +194,7 @@ function SubfieldRenderer({ field, value, onChange, disabled = false }) {
                     disabled={disabled}
                     onChange={(checked) => onChange(Boolean(checked))}
                 />
-                <div style={{ fontSize: 12, color: '#50575e', marginTop: 4 }}>
+                <div className="enterprise-cpt-field-toggle__help">
                     {`${field.on_text || 'On'} / ${field.off_text || 'Off'}`}
                 </div>
             </div>
@@ -219,11 +219,11 @@ function SubfieldRenderer({ field, value, onChange, disabled = false }) {
         };
 
         return (
-            <div style={{ marginBottom: 16 }}>
-                <p style={{ fontWeight: 600, fontSize: 11, textTransform: 'uppercase', marginBottom: 4 }}>
+            <div className="enterprise-cpt-field-image">
+                <p className="enterprise-cpt-field-image__label">
                     {field.label || field.name}
                 </p>
-                <div style={{ display: 'flex', gap: 8 }}>
+                <div className="enterprise-cpt-field-image__actions">
                     <Button variant="secondary" isSmall disabled={disabled} onClick={openMedia}>
                         {attachmentId ? 'Replace Image' : 'Select Image'}
                     </Button>
@@ -234,7 +234,7 @@ function SubfieldRenderer({ field, value, onChange, disabled = false }) {
                     )}
                 </div>
                 {attachmentId > 0 && (
-                    <p style={{ fontSize: 12, color: '#757575', marginTop: 4 }}>
+                    <p className="enterprise-cpt-field-image__meta">
                         Attachment ID: {attachmentId}
                     </p>
                 )}
@@ -354,26 +354,12 @@ export default function Edit({ name, attributes, setAttributes }) {
 
             {/* SSR Live Preview when data exists */}
             {hasData && (
-                <div
-                    style={{
-                        border: '1px solid var(--wp-admin-theme-color, #007cba)',
-                        borderRadius: 2,
-                        background: 'var(--wp-admin-theme-color-darker-10, #fafafa)',
-                        overflow: 'hidden',
-                    }}
-                >
+                <div className="enterprise-cpt-block-preview">
                     <CardBody>
-                        <div
-                            style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                marginBottom: 12,
-                            }}
-                        >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <span className={`dashicons dashicons-${groupIcon}`} style={{ fontSize: 20, width: 20, height: 20, color: 'var(--wp-admin-theme-color, #007cba)' }} />
-                                <strong style={{ fontSize: 14 }}>
+                        <div className="enterprise-cpt-block-preview__header">
+                            <div className="enterprise-cpt-block-preview__header-left">
+                                <span className={`dashicons dashicons-${groupIcon} enterprise-cpt-block-preview__icon`} />
+                                <strong className="enterprise-cpt-block-preview__title">
                                     {group.title || fieldGroupSlug}
                                 </strong>
                             </div>
@@ -399,9 +385,9 @@ export default function Edit({ name, attributes, setAttributes }) {
                     title={`Editing ${group.title || fieldGroupSlug}`}
                     onRequestClose={() => setIsModalOpen(false)}
                 >
-                    <div style={{ minWidth: 480 }}>
+                    <div className="enterprise-cpt-block-modal">
                         {isReadOnly && (
-                            <p style={{ marginTop: 0, marginBottom: 16, padding: 10, background: '#f0f6fc', border: '1px solid #c3dcf6', borderRadius: 2 }}>
+                            <p className="enterprise-cpt-block-modal__alert">
                                 Read Only: You lack permissions to edit this data.
                             </p>
                         )}
@@ -416,16 +402,7 @@ export default function Edit({ name, attributes, setAttributes }) {
                         ))}
                     </div>
 
-                    <div
-                        style={{
-                            display: 'flex',
-                            justifyContent: 'flex-end',
-                            gap: 8,
-                            marginTop: 24,
-                            paddingTop: 16,
-                            borderTop: '1px solid #ddd',
-                        }}
-                    >
+                    <div className="enterprise-cpt-block-modal__actions">
                         <Button variant="primary" onClick={() => setIsModalOpen(false)}>
                             Done
                         </Button>
