@@ -41,17 +41,17 @@ final class PermissionResolver
 
         if ($customCapability !== '') {
             if (user_can($userId, $customCapability)) {
-                return AccessLevel::FULL;
+                return $readOnly ? AccessLevel::READ_ONLY : AccessLevel::FULL;
             }
 
-            return $readOnly ? AccessLevel::READ_ONLY : AccessLevel::NONE;
+            return AccessLevel::NONE;
         }
 
         if ($this->meets_minimum_role($userId, $minimumRole)) {
-            return AccessLevel::FULL;
+            return $readOnly ? AccessLevel::READ_ONLY : AccessLevel::FULL;
         }
 
-        return $readOnly ? AccessLevel::READ_ONLY : AccessLevel::NONE;
+        return AccessLevel::NONE;
     }
 
     /**

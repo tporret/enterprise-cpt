@@ -54,19 +54,25 @@ final class FieldGroups
 
         if (! $this->is_readonly_env()) {
             $targetFile = $this->storagePath . DIRECTORY_SEPARATOR . $normalizedSlug . '.json';
-            file_put_contents($targetFile, (string) wp_json_encode($definition, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+            $encodedDefinition = wp_json_encode($definition, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
 
-            // Remove any stale DB-buffer copy so filesystem remains source-of-truth.
-            $buffer = get_option($this->bufferOptionName, []);
-            if (is_array($buffer) && array_key_exists($normalizedSlug, $buffer)) {
-                unset($buffer[$normalizedSlug]);
-                update_option($this->bufferOptionName, $buffer, false);
+            if (is_string($encodedDefinition) && $this->writeJsonAtomically($targetFile, $encodedDefinition)) {
+                // Remove any stale DB-buffer copy so filesystem remains source-of-truth.
+                $buffer = get_option($this->bufferOptionName, []);
+                if (is_array($buffer) && array_key_exists($normalizedSlug, $buffer)) {
+                    unset($buffer[$normalizedSlug]);
+                    update_option($this->bufferOptionName, $buffer, false);
+                }
+
+                $this->flushCaches();
+                do_action('enterprise_cpt/field_group_saved', $normalizedSlug, $definition);
+
+                return;
             }
 
-            $this->flushCaches();
-            do_action('enterprise_cpt/field_group_saved', $normalizedSlug, $definition);
-
-            return;
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log(sprintf('Enterprise CPT warning: unable to atomically write field group "%s" to %s; falling back to DB buffer.', $normalizedSlug, $targetFile));
+            }
         }
 
         $buffer = get_option($this->bufferOptionName, []);
@@ -633,5 +639,25 @@ final class FieldGroups
     {
         $this->filesystemDefinitions = null;
         $this->mergedDefinitions = null;
+    }
+
+    private function writeJsonAtomically(string $targetFile, string $contents): bool
+    {
+        $tempFile = $targetFile . '.tmp-' . wp_generate_uuid4();
+        $bytesWritten = @file_put_contents($tempFile, $contents, LOCK_EX);
+
+        if ($bytesWritten === false) {
+            @unlink($tempFile);
+
+            return false;
+        }
+
+        if (! @rename($tempFile, $targetFile)) {
+            @unlink($tempFile);
+
+            return false;
+        }
+
+        return true;
     }
 }

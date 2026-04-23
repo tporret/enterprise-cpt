@@ -8,6 +8,58 @@ use JsonException;
 
 final class CPT
 {
+    private const ALLOWED_DEFINITION_ARG_KEYS = [
+        'label',
+        'labels',
+        'description',
+        'public',
+        'publicly_queryable',
+        'exclude_from_search',
+        'show_ui',
+        'show_in_menu',
+        'show_in_admin_bar',
+        'show_in_nav_menus',
+        'show_in_rest',
+        'rest_base',
+        'menu_position',
+        'menu_icon',
+        'hierarchical',
+        'has_archive',
+        'rewrite',
+        'query_var',
+        'can_export',
+        'delete_with_user',
+        'supports',
+        'taxonomies',
+        // Internal UI-only flag used by the CPT manager screen.
+        'enterprise_custom_table',
+    ];
+
+    private const REGISTERABLE_ARG_KEYS = [
+        'label',
+        'labels',
+        'description',
+        'public',
+        'publicly_queryable',
+        'exclude_from_search',
+        'show_ui',
+        'show_in_menu',
+        'show_in_admin_bar',
+        'show_in_nav_menus',
+        'show_in_rest',
+        'rest_base',
+        'menu_position',
+        'menu_icon',
+        'hierarchical',
+        'has_archive',
+        'rewrite',
+        'query_var',
+        'can_export',
+        'delete_with_user',
+        'supports',
+        'taxonomies',
+    ];
+
     private string $storagePath;
 
     private string $bufferOptionName;
@@ -78,18 +130,24 @@ final class CPT
 
         if (! $this->is_readonly_env()) {
             $targetFile = $this->storagePath . DIRECTORY_SEPARATOR . $normalizedSlug . '.json';
-            file_put_contents($targetFile, (string) wp_json_encode($definition, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+            $encodedDefinition = wp_json_encode($definition, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
 
-            // Remove stale DB-buffer value when filesystem save succeeds.
-            $buffer = get_option($this->bufferOptionName, []);
-            if (is_array($buffer) && array_key_exists($normalizedSlug, $buffer)) {
-                unset($buffer[$normalizedSlug]);
-                update_option($this->bufferOptionName, $buffer, false);
+            if (is_string($encodedDefinition) && $this->writeJsonAtomically($targetFile, $encodedDefinition)) {
+                // Remove stale DB-buffer value when filesystem save succeeds.
+                $buffer = get_option($this->bufferOptionName, []);
+                if (is_array($buffer) && array_key_exists($normalizedSlug, $buffer)) {
+                    unset($buffer[$normalizedSlug]);
+                    update_option($this->bufferOptionName, $buffer, false);
+                }
+
+                $this->flushCaches();
+
+                return;
             }
 
-            $this->flushCaches();
-
-            return;
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log(sprintf('Enterprise CPT warning: unable to atomically write definition "%s" to %s; falling back to DB buffer.', $normalizedSlug, $targetFile));
+            }
         }
 
         $buffer = get_option($this->bufferOptionName, []);
@@ -190,10 +248,10 @@ final class CPT
 
     private function normalizeDefinition(string $slug, array $definition): array
     {
-        $args = is_array($definition['args'] ?? null) ? $definition['args'] : [];
+        $args = $this->sanitizeDefinitionArgs(is_array($definition['args'] ?? null) ? $definition['args'] : []);
 
         if (isset($definition['labels']) && is_array($definition['labels'])) {
-            $args['labels'] = $definition['labels'];
+            $args['labels'] = $this->sanitizeLabels($definition['labels']);
         }
 
         $definition['name'] = $slug;
@@ -205,7 +263,14 @@ final class CPT
 
     private function buildArgs(string $slug, array $definition): array
     {
-        $args = is_array($definition['args'] ?? null) ? $definition['args'] : [];
+        $rawArgs = is_array($definition['args'] ?? null) ? $definition['args'] : [];
+        $args = [];
+
+        foreach (self::REGISTERABLE_ARG_KEYS as $key) {
+            if (array_key_exists($key, $rawArgs)) {
+                $args[$key] = $rawArgs[$key];
+            }
+        }
 
         $args['label'] = $args['label'] ?? ucfirst(str_replace(['-', '_'], ' ', $slug));
         $args['public'] = $args['public'] ?? true;
@@ -222,9 +287,175 @@ final class CPT
         return $args;
     }
 
+    /**
+     * @param array<string, mixed> $args
+     * @return array<string, mixed>
+     */
+    private function sanitizeDefinitionArgs(array $args): array
+    {
+        $sanitized = [];
+
+        foreach (self::ALLOWED_DEFINITION_ARG_KEYS as $key) {
+            if (! array_key_exists($key, $args)) {
+                continue;
+            }
+
+            $value = $args[$key];
+
+            switch ($key) {
+                case 'label':
+                case 'description':
+                case 'menu_icon':
+                    $sanitized[$key] = sanitize_text_field((string) $value);
+                    break;
+
+                case 'rest_base':
+                case 'query_var':
+                    $sanitized[$key] = sanitize_key((string) $value);
+                    break;
+
+                case 'menu_position':
+                    $sanitized[$key] = is_numeric($value) ? absint((int) $value) : null;
+                    break;
+
+                case 'show_in_menu':
+                    $sanitized[$key] = is_bool($value)
+                        ? $value
+                        : sanitize_key((string) $value);
+                    break;
+
+                case 'has_archive':
+                    $sanitized[$key] = is_bool($value)
+                        ? $value
+                        : sanitize_key((string) $value);
+                    break;
+
+                case 'rewrite':
+                    if (is_bool($value)) {
+                        $sanitized[$key] = $value;
+                        break;
+                    }
+
+                    if (is_array($value)) {
+                        $rewrite = [];
+
+                        if (isset($value['slug'])) {
+                            $rewrite['slug'] = sanitize_title((string) $value['slug']);
+                        }
+
+                        if (isset($value['with_front'])) {
+                            $rewrite['with_front'] = (bool) $value['with_front'];
+                        }
+
+                        if (isset($value['feeds'])) {
+                            $rewrite['feeds'] = (bool) $value['feeds'];
+                        }
+
+                        if (isset($value['pages'])) {
+                            $rewrite['pages'] = (bool) $value['pages'];
+                        }
+
+                        if ($rewrite !== []) {
+                            $sanitized[$key] = $rewrite;
+                        }
+                    }
+                    break;
+
+                case 'supports':
+                    if (is_array($value)) {
+                        $supports = [];
+
+                        foreach ($value as $support) {
+                            $normalized = sanitize_key((string) $support);
+
+                            if ($normalized === '') {
+                                continue;
+                            }
+
+                            $supports[] = $normalized;
+                        }
+
+                        $sanitized[$key] = array_values(array_unique($supports));
+                    }
+                    break;
+
+                case 'taxonomies':
+                    if (is_array($value)) {
+                        $taxonomies = [];
+
+                        foreach ($value as $taxonomy) {
+                            $normalized = sanitize_key((string) $taxonomy);
+
+                            if ($normalized === '') {
+                                continue;
+                            }
+
+                            $taxonomies[] = $normalized;
+                        }
+
+                        $sanitized[$key] = array_values(array_unique($taxonomies));
+                    }
+                    break;
+
+                case 'labels':
+                    if (is_array($value)) {
+                        $sanitized[$key] = $this->sanitizeLabels($value);
+                    }
+                    break;
+
+                default:
+                    $sanitized[$key] = (bool) $value;
+                    break;
+            }
+        }
+
+        return $sanitized;
+    }
+
+    /**
+     * @param array<string, mixed> $labels
+     * @return array<string, string>
+     */
+    private function sanitizeLabels(array $labels): array
+    {
+        $sanitized = [];
+
+        foreach ($labels as $labelKey => $labelValue) {
+            $key = sanitize_key((string) $labelKey);
+
+            if ($key === '') {
+                continue;
+            }
+
+            $sanitized[$key] = sanitize_text_field((string) $labelValue);
+        }
+
+        return $sanitized;
+    }
+
     private function flushCaches(): void
     {
         $this->filesystemDefinitions = null;
         $this->mergedDefinitions = null;
+    }
+
+    private function writeJsonAtomically(string $targetFile, string $contents): bool
+    {
+        $tempFile = $targetFile . '.tmp-' . wp_generate_uuid4();
+        $bytesWritten = @file_put_contents($tempFile, $contents, LOCK_EX);
+
+        if ($bytesWritten === false) {
+            @unlink($tempFile);
+
+            return false;
+        }
+
+        if (! @rename($tempFile, $targetFile)) {
+            @unlink($tempFile);
+
+            return false;
+        }
+
+        return true;
     }
 }

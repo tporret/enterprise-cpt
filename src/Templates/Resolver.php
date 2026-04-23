@@ -47,7 +47,7 @@ final class Resolver
         $uploadsDir = wp_upload_dir(null, false);
         $uploadsTemplate = $uploadsDir['basedir'] . "/enterprise-cpt/templates/{$slug}.php";
 
-        if (is_readable($uploadsTemplate)) {
+        if (self::isGeneratedUploadsTemplate($uploadsTemplate)) {
             return $uploadsTemplate;
         }
 
@@ -415,6 +415,8 @@ final class Resolver
         $slug = sanitize_key($slug);
         $uploadsDir = wp_upload_dir(null, false);
 
-        return is_readable($uploadsDir['basedir'] . "/enterprise-cpt/templates/{$slug}.php");
+        $path = $uploadsDir['basedir'] . "/enterprise-cpt/templates/{$slug}.php";
+
+        return self::isGeneratedUploadsTemplate($path);
     }
 }

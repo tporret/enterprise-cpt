@@ -44,6 +44,14 @@ final class FieldGroupController
                 'methods' => 'GET',
                 'callback' => [$this, 'get_item'],
                 'permission_callback' => [$this, 'can_manage'],
+                'args' => [
+                    'slug' => [
+                        'required' => true,
+                        'type' => 'string',
+                        'sanitize_callback' => 'sanitize_key',
+                        'validate_callback' => static fn ($value): bool => is_string($value) && sanitize_key($value) !== '',
+                    ],
+                ],
             ]
         );
 
@@ -114,6 +122,37 @@ final class FieldGroupController
                 'methods' => 'GET',
                 'callback' => [$this, 'search_items'],
                 'permission_callback' => [$this, 'can_manage'],
+                'args' => [
+                    'type' => [
+                        'required' => true,
+                        'type' => 'string',
+                        'enum' => ['post_type', 'taxonomy', 'user_role'],
+                        'sanitize_callback' => 'sanitize_key',
+                    ],
+                    'q' => [
+                        'required' => false,
+                        'type' => 'string',
+                        'default' => '',
+                        'sanitize_callback' => 'sanitize_text_field',
+                    ],
+                    'page' => [
+                        'required' => false,
+                        'type' => 'integer',
+                        'default' => 1,
+                        'minimum' => 1,
+                        'sanitize_callback' => 'absint',
+                        'validate_callback' => static fn ($value): bool => is_numeric($value) && (int) $value >= 1,
+                    ],
+                    'per_page' => [
+                        'required' => false,
+                        'type' => 'integer',
+                        'default' => 20,
+                        'minimum' => 1,
+                        'maximum' => 20,
+                        'sanitize_callback' => 'absint',
+                        'validate_callback' => static fn ($value): bool => is_numeric($value) && (int) $value >= 1 && (int) $value <= 20,
+                    ],
+                ],
             ]
         );
 
@@ -311,9 +350,44 @@ final class FieldGroupController
             );
         }
 
-        $this->set_field_group_order($slugs);
+        $normalizedRequested = [];
 
-        return new WP_REST_Response(['success' => true, 'order' => $slugs], 200);
+        foreach ($slugs as $slug) {
+            $normalizedSlug = sanitize_key((string) $slug);
+
+            if ($normalizedSlug === '') {
+                continue;
+            }
+
+            $normalizedRequested[] = $normalizedSlug;
+        }
+
+        $normalizedRequested = array_values(array_unique($normalizedRequested));
+
+        $existingSlugs = array_values(array_map(
+            'sanitize_key',
+            array_keys($this->fieldGroups->definitions())
+        ));
+
+        $order = array_values(array_intersect($normalizedRequested, $existingSlugs));
+
+        if ($order === []) {
+            return new WP_Error(
+                'enterprise_cpt_invalid_reorder',
+                'No valid field group slugs were provided.',
+                ['status' => 400]
+            );
+        }
+
+        foreach ($existingSlugs as $existingSlug) {
+            if (! in_array($existingSlug, $order, true)) {
+                $order[] = $existingSlug;
+            }
+        }
+
+        $this->set_field_group_order($order);
+
+        return new WP_REST_Response(['success' => true, 'order' => $order], 200);
     }
 
     private function get_field_group_order(): array
@@ -413,10 +487,165 @@ final class FieldGroupController
                 $group['readonly'] = true;
             }
 
-            $visible[] = $group;
+            $visible[] = $this->sanitize_group_for_post_editor($group);
         }
 
         return new WP_REST_Response($visible, 200);
+    }
+
+    /**
+     * Reduce response payload to only data needed for post-editor rendering.
+     *
+     * @param array<string, mixed> $group
+     * @return array<string, mixed>
+     */
+    private function sanitize_group_for_post_editor(array $group): array
+    {
+        $name = sanitize_key((string) ($group['name'] ?? ''));
+        $title = sanitize_text_field((string) ($group['title'] ?? $name));
+        $postType = sanitize_key((string) ($group['post_type'] ?? ''));
+        $isBlock = (bool) ($group['is_block'] ?? false);
+        $readonly = (bool) ($group['readonly'] ?? false);
+
+        $locations = [];
+
+        foreach (is_array($group['locations'] ?? null) ? $group['locations'] : [] as $location) {
+            if (! is_array($location)) {
+                continue;
+            }
+
+            $type = sanitize_key((string) ($location['type'] ?? ''));
+
+            if ($type === '') {
+                continue;
+            }
+
+            $values = [];
+
+            foreach (is_array($location['values'] ?? null) ? $location['values'] : [] as $value) {
+                $value = sanitize_key((string) $value);
+
+                if ($value === '') {
+                    continue;
+                }
+
+                $values[] = $value;
+            }
+
+            $locations[] = [
+                'type' => $type,
+                'values' => $values,
+            ];
+        }
+
+        $fields = [];
+
+        foreach (is_array($group['fields'] ?? null) ? $group['fields'] : [] as $field) {
+            if (! is_array($field)) {
+                continue;
+            }
+
+            $fieldName = sanitize_key((string) ($field['name'] ?? ''));
+
+            if ($fieldName === '') {
+                continue;
+            }
+
+            $sanitizedField = [
+                'name' => $fieldName,
+                'label' => sanitize_text_field((string) ($field['label'] ?? $fieldName)),
+                'type' => sanitize_key((string) ($field['type'] ?? 'text')),
+                'help' => sanitize_text_field((string) ($field['help'] ?? '')),
+                'default' => $field['default'] ?? '',
+            ];
+
+            if (array_key_exists('min', $field)) {
+                $sanitizedField['min'] = is_numeric($field['min']) ? 0 + $field['min'] : '';
+            }
+
+            if (array_key_exists('max', $field)) {
+                $sanitizedField['max'] = is_numeric($field['max']) ? 0 + $field['max'] : '';
+            }
+
+            if (array_key_exists('step', $field)) {
+                $sanitizedField['step'] = is_numeric($field['step']) ? 0 + $field['step'] : '';
+            }
+
+            if (array_key_exists('on_text', $field)) {
+                $sanitizedField['on_text'] = sanitize_text_field((string) $field['on_text']);
+            }
+
+            if (array_key_exists('off_text', $field)) {
+                $sanitizedField['off_text'] = sanitize_text_field((string) $field['off_text']);
+            }
+
+            if (array_key_exists('image_size', $field)) {
+                $sanitizedField['image_size'] = sanitize_key((string) $field['image_size']);
+            }
+
+            if (array_key_exists('image_link', $field)) {
+                $sanitizedField['image_link'] = sanitize_key((string) $field['image_link']);
+            }
+
+            if (is_array($field['choices'] ?? null)) {
+                $choices = [];
+
+                foreach ($field['choices'] as $choice) {
+                    if (! is_array($choice)) {
+                        continue;
+                    }
+
+                    $value = isset($choice['value']) ? sanitize_text_field((string) $choice['value']) : '';
+
+                    if ($value === '') {
+                        continue;
+                    }
+
+                    $choices[] = [
+                        'value' => $value,
+                        'label' => sanitize_text_field((string) ($choice['label'] ?? $value)),
+                    ];
+                }
+
+                $sanitizedField['choices'] = $choices;
+            }
+
+            if (is_array($field['rows'] ?? null)) {
+                $rows = [];
+
+                foreach ($field['rows'] as $rowField) {
+                    if (! is_array($rowField)) {
+                        continue;
+                    }
+
+                    $rowName = sanitize_key((string) ($rowField['name'] ?? ''));
+
+                    if ($rowName === '') {
+                        continue;
+                    }
+
+                    $rows[] = [
+                        'name' => $rowName,
+                        'label' => sanitize_text_field((string) ($rowField['label'] ?? $rowName)),
+                        'type' => sanitize_key((string) ($rowField['type'] ?? 'text')),
+                    ];
+                }
+
+                $sanitizedField['rows'] = $rows;
+            }
+
+            $fields[] = $sanitizedField;
+        }
+
+        return [
+            'name' => $name,
+            'title' => $title,
+            'post_type' => $postType,
+            'is_block' => $isBlock,
+            'readonly' => $readonly,
+            'locations' => $locations,
+            'fields' => $fields,
+        ];
     }
 
     public function search_items(WP_REST_Request $request): WP_REST_Response|WP_Error

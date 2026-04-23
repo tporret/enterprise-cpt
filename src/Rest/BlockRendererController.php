@@ -16,6 +16,8 @@ final class BlockRendererController
 
     private const CACHE_GROUP = 'enterprise_cpt_block_render';
 
+    private const MAX_ATTRIBUTE_DEPTH = 6;
+
     private FieldGroups $fieldGroups;
 
     public function __construct(FieldGroups $fieldGroups)
@@ -63,13 +65,6 @@ final class BlockRendererController
             $attributes = [];
         }
 
-        $cacheKey = 'block_' . md5($blockName . ':' . wp_json_encode($attributes));
-        $cachedHtml = wp_cache_get($cacheKey, self::CACHE_GROUP);
-
-        if (is_string($cachedHtml)) {
-            return new WP_REST_Response(['html' => $cachedHtml], 200);
-        }
-
         // Find the field group definition so Resolver has full context.
         $group = null;
 
@@ -88,10 +83,19 @@ final class BlockRendererController
             return new WP_REST_Response(
                 [
                     'html'  => '',
-                    'error' => sprintf('Field group "%s" not found.', $blockName),
+                    'error' => 'Block not found.',
                 ],
                 404
             );
+        }
+
+        $attributes = $this->sanitize_attributes_for_group($attributes, $group);
+
+        $cacheKey = 'block_' . md5($blockName . ':' . wp_json_encode($attributes));
+        $cachedHtml = wp_cache_get($cacheKey, self::CACHE_GROUP);
+
+        if (is_string($cachedHtml)) {
+            return new WP_REST_Response(['html' => $cachedHtml], 200);
         }
 
         $html = Resolver::render_block($group, $attributes);
@@ -107,5 +111,83 @@ final class BlockRendererController
         $slug = preg_replace('/-+/', '-', $slug) ?? '';
 
         return trim($slug, '-');
+    }
+
+    /**
+     * Allow only declared block fields and internal metadata keys.
+     *
+     * @param array<string, mixed> $attributes
+     * @param array<string, mixed> $group
+     * @return array<string, mixed>
+     */
+    private function sanitize_attributes_for_group(array $attributes, array $group): array
+    {
+        $allowedKeys = [
+            'blockInstanceId' => true,
+            'fieldGroupSlug' => true,
+        ];
+
+        foreach (is_array($group['fields'] ?? null) ? $group['fields'] : [] as $fieldDefinition) {
+            if (! is_array($fieldDefinition)) {
+                continue;
+            }
+
+            $name = (string) ($fieldDefinition['name'] ?? '');
+
+            if ($name === '') {
+                continue;
+            }
+
+            $allowedKeys[$name] = true;
+        }
+
+        $sanitized = [];
+
+        foreach ($attributes as $key => $value) {
+            $key = is_string($key) ? $key : (string) $key;
+
+            if (! isset($allowedKeys[$key])) {
+                continue;
+            }
+
+            $sanitized[$key] = $this->sanitize_attribute_value($value, 0);
+        }
+
+        return $sanitized;
+    }
+
+    private function sanitize_attribute_value(mixed $value, int $depth): mixed
+    {
+        if ($depth >= self::MAX_ATTRIBUTE_DEPTH) {
+            return '';
+        }
+
+        if (is_array($value)) {
+            $normalized = [];
+
+            foreach ($value as $itemKey => $itemValue) {
+                $normalizedKey = is_string($itemKey)
+                    ? sanitize_key($itemKey)
+                    : (int) $itemKey;
+
+                if ($normalizedKey === '') {
+                    continue;
+                }
+
+                $normalized[$normalizedKey] = $this->sanitize_attribute_value($itemValue, $depth + 1);
+            }
+
+            return $normalized;
+        }
+
+        if (is_bool($value) || is_int($value) || is_float($value) || $value === null) {
+            return $value;
+        }
+
+        if (is_string($value)) {
+            return wp_kses_post($value);
+        }
+
+        return '';
     }
 }
