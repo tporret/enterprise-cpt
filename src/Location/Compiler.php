@@ -184,9 +184,21 @@ final class Compiler
             return;
         }
 
-        file_put_contents($this->registryPath, (string) wp_json_encode($registry, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
-        delete_option($this->bufferOptionName);
+        $encoded = wp_json_encode($registry, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+
+        if (is_string($encoded) && $this->writeJsonAtomically($this->registryPath, $encoded)) {
+            delete_option($this->bufferOptionName);
+            update_option($this->signatureOptionName, $this->definitionsSignature(), false);
+
+            return;
+        }
+
+        update_option($this->bufferOptionName, $registry, false);
         update_option($this->signatureOptionName, $this->definitionsSignature(), false);
+
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log(sprintf('Enterprise CPT warning: unable to atomically write location registry to %s; falling back to DB buffer.', $this->registryPath));
+        }
     }
 
     private function definitionsSignature(): string
@@ -203,5 +215,25 @@ final class Compiler
         $directory = dirname($path);
 
         return ! is_dir($directory) || ! is_writable($directory);
+    }
+
+    private function writeJsonAtomically(string $targetFile, string $contents): bool
+    {
+        $tempFile = $targetFile . '.tmp-' . wp_generate_uuid4();
+        $bytesWritten = @file_put_contents($tempFile, $contents, LOCK_EX);
+
+        if ($bytesWritten === false) {
+            @unlink($tempFile);
+
+            return false;
+        }
+
+        if (! @rename($tempFile, $targetFile)) {
+            @unlink($tempFile);
+
+            return false;
+        }
+
+        return true;
     }
 }

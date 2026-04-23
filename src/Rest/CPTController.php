@@ -13,6 +13,8 @@ final class CPTController
 {
     private const NAMESPACE = 'enterprise-cpt/v1';
 
+    private const MAX_DEFINITION_PAYLOAD_BYTES = 131072;
+
     private CPT $cptEngine;
 
     private string $storagePath;
@@ -56,7 +58,7 @@ final class CPTController
                         'required' => true,
                         'type' => 'array',
                         'sanitize_callback' => static fn ($value) => is_array($value) ? $value : [],
-                        'validate_callback' => static fn ($value): bool => is_array($value),
+                        'validate_callback' => static fn ($value): bool => self::isValidDefinitionPayload($value),
                     ],
                 ],
             ]
@@ -112,6 +114,14 @@ final class CPTController
             );
         }
 
+        if (! self::isValidDefinitionPayload($definition)) {
+            return new WP_Error(
+                'enterprise_cpt_definition_too_large',
+                'CPT definition payload is too large.',
+                ['status' => 413]
+            );
+        }
+
         $this->cptEngine->save_definition($slug, $definition);
 
         $current = $this->cptEngine->definitions()[$slug] ?? null;
@@ -126,8 +136,36 @@ final class CPTController
         );
     }
 
-    public function can_manage(): bool
+    public function can_manage(): bool|WP_Error
     {
-        return current_user_can('manage_options');
+        if (! is_user_logged_in()) {
+            return new WP_Error(
+                'rest_not_logged_in',
+                'Authentication required.',
+                ['status' => 401]
+            );
+        }
+
+        if (! current_user_can('manage_options')) {
+            return new WP_Error(
+                'rest_forbidden',
+                'You are not allowed to manage Enterprise CPT resources.',
+                ['status' => 403]
+            );
+        }
+
+        return true;
+    }
+
+    private static function isValidDefinitionPayload(mixed $definition): bool
+    {
+        if (! is_array($definition)) {
+            return false;
+        }
+
+        $encoded = wp_json_encode($definition);
+
+        return is_string($encoded)
+            && strlen($encoded) <= self::MAX_DEFINITION_PAYLOAD_BYTES;
     }
 }

@@ -15,6 +15,8 @@ final class FieldGroupController
 {
     private const NAMESPACE = 'enterprise-cpt/v1';
 
+    private const MAX_DEFINITION_PAYLOAD_BYTES = 262144;
+
     private FieldGroups $fieldGroups;
 
     private PermissionResolver $permissionResolver;
@@ -91,7 +93,7 @@ final class FieldGroupController
                         'required' => true,
                         'type' => 'array',
                         'sanitize_callback' => static fn ($value) => is_array($value) ? $value : [],
-                        'validate_callback' => static fn ($value): bool => is_array($value),
+                        'validate_callback' => static fn ($value): bool => self::isValidDefinitionPayload($value),
                     ],
                 ],
             ]
@@ -162,7 +164,7 @@ final class FieldGroupController
             [
                 'methods'             => 'GET',
                 'callback'            => [$this, 'get_groups_for_post_type'],
-                'permission_callback' => static fn (): bool => current_user_can('edit_posts'),
+                'permission_callback' => [$this, 'can_edit_posts'],
                 'args'                => [
                     'post_type' => [
                         'required'          => true,
@@ -289,6 +291,14 @@ final class FieldGroupController
             );
         }
 
+        if (! self::isValidDefinitionPayload($definition)) {
+            return new WP_Error(
+                'enterprise_cpt_definition_too_large',
+                'Field group definition payload is too large.',
+                ['status' => 413]
+            );
+        }
+
         $this->fieldGroups->save_definition($slug, $definition);
 
         $response = [
@@ -406,9 +416,58 @@ final class FieldGroupController
         update_option('enterprise_cpt_field_groups_order', array_map('sanitize_key', $slugs));
     }
 
-    public function can_manage(): bool
+    public function can_manage(): bool|WP_Error
     {
-        return current_user_can('manage_options');
+        if (! is_user_logged_in()) {
+            return new WP_Error(
+                'rest_not_logged_in',
+                'Authentication required.',
+                ['status' => 401]
+            );
+        }
+
+        if (! current_user_can('manage_options')) {
+            return new WP_Error(
+                'rest_forbidden',
+                'You are not allowed to manage Enterprise CPT resources.',
+                ['status' => 403]
+            );
+        }
+
+        return true;
+    }
+
+    public function can_edit_posts(): bool|WP_Error
+    {
+        if (! is_user_logged_in()) {
+            return new WP_Error(
+                'rest_not_logged_in',
+                'Authentication required.',
+                ['status' => 401]
+            );
+        }
+
+        if (! current_user_can('edit_posts')) {
+            return new WP_Error(
+                'rest_forbidden',
+                'You are not allowed to access field groups for this post type.',
+                ['status' => 403]
+            );
+        }
+
+        return true;
+    }
+
+    private static function isValidDefinitionPayload(mixed $definition): bool
+    {
+        if (! is_array($definition)) {
+            return false;
+        }
+
+        $encoded = wp_json_encode($definition);
+
+        return is_string($encoded)
+            && strlen($encoded) <= self::MAX_DEFINITION_PAYLOAD_BYTES;
     }
 
     /**
@@ -556,7 +615,6 @@ final class FieldGroupController
                 'label' => sanitize_text_field((string) ($field['label'] ?? $fieldName)),
                 'type' => sanitize_key((string) ($field['type'] ?? 'text')),
                 'help' => sanitize_text_field((string) ($field['help'] ?? '')),
-                'default' => $field['default'] ?? '',
             ];
 
             if (array_key_exists('min', $field)) {
