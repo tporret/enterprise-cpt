@@ -7,6 +7,7 @@ namespace EnterpriseCPT\Rest;
 use EnterpriseCPT\Engine\FieldGroups;
 use EnterpriseCPT\Security\AccessLevel;
 use EnterpriseCPT\Security\PermissionResolver;
+use EnterpriseCPT\Validation\DefinitionValidator;
 use WP_Error;
 use WP_REST_Request;
 use WP_REST_Response;
@@ -69,7 +70,7 @@ final class FieldGroupController
                         'required' => true,
                         'type' => 'string',
                         'sanitize_callback' => 'sanitize_key',
-                        'validate_callback' => static fn ($value): bool => is_string($value) && $value !== '',
+                        'validate_callback' => static fn ($value): bool => is_string($value) && $value !== '' && sanitize_key($value) === $value,
                     ],
                 ],
             ]
@@ -296,6 +297,16 @@ final class FieldGroupController
                 'enterprise_cpt_definition_too_large',
                 'Field group definition payload is too large.',
                 ['status' => 413]
+            );
+        }
+
+        $validationErrors = DefinitionValidator::validateFieldGroupDefinition($slug, $definition, $this->fieldGroups->definitions());
+
+        if ($validationErrors !== []) {
+            return new WP_Error(
+                'enterprise_cpt_invalid_field_group_definition',
+                'Field group definition failed validation.',
+                ['status' => 400, 'fields' => $validationErrors]
             );
         }
 

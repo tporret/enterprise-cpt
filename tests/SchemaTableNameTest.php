@@ -60,6 +60,16 @@ if (! isset($map['description']) || $map['description']['table'] !== $expectedTa
     exit(1);
 }
 
+if ($schema->get_column_format('image') !== '%d') {
+    echo "FAIL: expected image fields to use integer storage format.\n";
+    exit(1);
+}
+
+if ($schema->get_column_default('image') !== 0) {
+    echo "FAIL: expected image fields to clear to integer zero.\n";
+    exit(1);
+}
+
 $expectedChildTable = 'wp_enterprise_enterprise_repeater_price';
 $definitions[0]['fields'][0]['type'] = 'repeater';
 $definitions[0]['fields'][0]['rows'] = [];

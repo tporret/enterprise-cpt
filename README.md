@@ -152,6 +152,8 @@ The storage layer supports both standard post meta and custom-table storage.
 
 - Standard fields are registered into post meta for the resolved post types
 - Repeater values are stored as JSON shadows and can also be projected into relational child tables
+- Repeater child-table replacements roll back on failed writes instead of committing partial rows
+- Storage schema signatures include nested repeater rows so child-table migrations rerun after subfield edits
 - `TableManager` uses the active site prefix for multisite-safe table names
 - `Interceptor`, `Hydrator`, and `ShadowSync` keep custom-table reads and compatibility flows aligned
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace EnterpriseCPT\Rest;
 
 use EnterpriseCPT\Engine\CPT;
+use EnterpriseCPT\Validation\DefinitionValidator;
 use WP_Error;
 use WP_REST_Request;
 use WP_REST_Response;
@@ -52,7 +53,7 @@ final class CPTController
                         'required' => true,
                         'type' => 'string',
                         'sanitize_callback' => 'sanitize_key',
-                        'validate_callback' => static fn ($value): bool => is_string($value) && $value !== '',
+                        'validate_callback' => static fn ($value): bool => is_string($value) && $value !== '' && sanitize_key($value) === $value,
                     ],
                     'definition' => [
                         'required' => true,
@@ -119,6 +120,16 @@ final class CPTController
                 'enterprise_cpt_definition_too_large',
                 'CPT definition payload is too large.',
                 ['status' => 413]
+            );
+        }
+
+        $validationErrors = DefinitionValidator::validateCptDefinition($slug, $definition);
+
+        if ($validationErrors !== []) {
+            return new WP_Error(
+                'enterprise_cpt_invalid_cpt_definition',
+                'CPT definition failed validation.',
+                ['status' => 400, 'fields' => $validationErrors]
             );
         }
 

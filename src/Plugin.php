@@ -29,6 +29,8 @@ use EnterpriseCPT\Templates\Scaffolder;
 
 final class Plugin
 {
+    private const STORAGE_SCHEMA_VERSION = '1';
+
     private static ?self $instance = null;
 
     private string $pluginFile;
@@ -514,34 +516,9 @@ final class Plugin
                 continue;
             }
 
-            $fields = is_array($group['fields'] ?? null) ? $group['fields'] : [];
-            $fieldSignature = [];
-
-            foreach ($fields as $field) {
-                if (! is_array($field)) {
-                    continue;
-                }
-
-                $fieldName = sanitize_key((string) ($field['name'] ?? ''));
-
-                if ($fieldName === '') {
-                    continue;
-                }
-
-                $fieldSignature[] = [
-                    'name' => $fieldName,
-                    'type' => (string) ($field['type'] ?? 'text'),
-                ];
-            }
-
-            usort(
-                $fieldSignature,
-                static fn (array $a, array $b): int => strcmp($a['name'] . ':' . $a['type'], $b['name'] . ':' . $b['type'])
-            );
-
             $signaturePayload[] = [
                 'table' => $tableName,
-                'fields' => $fieldSignature,
+                'fields' => $this->storageFieldSignature(is_array($group['fields'] ?? null) ? $group['fields'] : []),
             ];
         }
 
@@ -550,7 +527,48 @@ final class Plugin
             static fn (array $a, array $b): int => strcmp($a['table'], $b['table'])
         );
 
-        return md5((string) wp_json_encode($signaturePayload));
+        return md5((string) wp_json_encode([
+            'version' => self::STORAGE_SCHEMA_VERSION,
+            'tables' => $signaturePayload,
+        ]));
+    }
+
+    /**
+     * Build a deterministic field signature, including repeater child schemas.
+     */
+    private function storageFieldSignature(array $fields): array
+    {
+        $fieldSignature = [];
+
+        foreach ($fields as $field) {
+            if (! is_array($field)) {
+                continue;
+            }
+
+            $fieldName = sanitize_key((string) ($field['name'] ?? ''));
+
+            if ($fieldName === '') {
+                continue;
+            }
+
+            $entry = [
+                'name' => $fieldName,
+                'type' => (string) ($field['type'] ?? 'text'),
+            ];
+
+            if (($field['type'] ?? '') === 'repeater') {
+                $entry['rows'] = $this->storageFieldSignature(is_array($field['rows'] ?? null) ? $field['rows'] : []);
+            }
+
+            $fieldSignature[] = $entry;
+        }
+
+        usort(
+            $fieldSignature,
+            static fn (array $a, array $b): int => strcmp($a['name'] . ':' . $a['type'], $b['name'] . ':' . $b['type'])
+        );
+
+        return $fieldSignature;
     }
 
     public function registerRestControllers(): void

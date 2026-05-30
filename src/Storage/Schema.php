@@ -22,6 +22,7 @@ final class Schema
         'repeater'   => 'LONGTEXT NOT NULL',
         'number'     => 'BIGINT(20) NOT NULL DEFAULT 0',
         'true_false' => 'TINYINT(1) NOT NULL DEFAULT 0',
+        'image'      => 'BIGINT(20) UNSIGNED NOT NULL DEFAULT 0',
     ];
 
     /**
@@ -38,6 +39,7 @@ final class Schema
         'repeater'   => '%s',
         'number'     => '%d',
         'true_false' => '%d',
+        'image'      => '%d',
     ];
 
     /**
@@ -54,6 +56,7 @@ final class Schema
         'repeater'   => '[]',
         'number'     => 0,
         'true_false' => 0,
+        'image'      => 0,
     ];
 
     /**

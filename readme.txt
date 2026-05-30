@@ -112,6 +112,8 @@ Example: A "Product Details" field group can appear on Post, Product, and Servic
 
 - Optional custom table storage per field group
 - Relational repeater child-table storage in custom table mode (`wp_enterprise_repeater_{field_name}`)
+- Transaction-safe repeater child-table replacement with rollback on failed writes
+- Versioned storage signatures that include nested repeater row schemas
 - Postmeta shadow sync support for compatibility
 - Metadata interception + cache layer for reduced query overhead
 

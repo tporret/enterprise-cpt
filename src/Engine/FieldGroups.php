@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace EnterpriseCPT\Engine;
 
+use EnterpriseCPT\Validation\DefinitionValidator;
 use JsonException;
 
 final class FieldGroups
@@ -43,6 +44,10 @@ final class FieldGroups
         $normalizedSlug = sanitize_key($slug);
 
         if ($normalizedSlug === '') {
+            return;
+        }
+
+        if (DefinitionValidator::validateFieldGroupDefinition($normalizedSlug, $data, $this->definitions()) !== []) {
             return;
         }
 
@@ -173,7 +178,13 @@ final class FieldGroups
                 continue;
             }
 
-            $definitions[$slug] = $this->normalizeDefinition($slug, $decoded, $filePath);
+            $definition = $this->normalizeDefinition($slug, $decoded, $filePath);
+
+            if (DefinitionValidator::validateFieldGroupDefinition($slug, $definition, $definitions) !== []) {
+                continue;
+            }
+
+            $definitions[$slug] = $definition;
         }
 
         $this->filesystemDefinitions = $definitions;
@@ -198,7 +209,13 @@ final class FieldGroups
                 continue;
             }
 
-            $definitions[$normalizedSlug] = $this->normalizeDefinition($normalizedSlug, $definition);
+            $normalizedDefinition = $this->normalizeDefinition($normalizedSlug, $definition);
+
+            if (DefinitionValidator::validateFieldGroupDefinition($normalizedSlug, $normalizedDefinition, $this->filesystemDefinitions() + $definitions) !== []) {
+                continue;
+            }
+
+            $definitions[$normalizedSlug] = $normalizedDefinition;
         }
 
         return $definitions;
@@ -265,10 +282,10 @@ final class FieldGroups
 
     private function normalizeBlockSlug(string $candidate, string $fallback): string
     {
-        $slug = sanitize_key($candidate);
+        $slug = strtolower($candidate);
 
-        if ($slug === '') {
-            $slug = sanitize_key($fallback);
+        if (trim($slug) === '') {
+            $slug = strtolower($fallback);
         }
 
         $slug = str_replace('_', '-', $slug);

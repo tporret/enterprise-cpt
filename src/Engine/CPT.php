@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace EnterpriseCPT\Engine;
 
+use EnterpriseCPT\Validation\DefinitionValidator;
 use JsonException;
 
 final class CPT
@@ -122,6 +123,10 @@ final class CPT
             return;
         }
 
+        if (DefinitionValidator::validateCptDefinition($normalizedSlug, $data) !== []) {
+            return;
+        }
+
         $definition = $this->normalizeDefinition($normalizedSlug, $data);
 
         if (! is_dir($this->storagePath)) {
@@ -215,6 +220,10 @@ final class CPT
                 continue;
             }
 
+            if (DefinitionValidator::validateCptDefinition($slug, $decoded) !== []) {
+                continue;
+            }
+
             $definitions[$slug] = $this->normalizeDefinition($slug, $decoded);
         }
 
@@ -237,6 +246,10 @@ final class CPT
             $normalizedSlug = sanitize_key((string) $slug);
 
             if ($normalizedSlug === '' || ! is_array($definition)) {
+                continue;
+            }
+
+            if (DefinitionValidator::validateCptDefinition($normalizedSlug, $definition) !== []) {
                 continue;
             }
 

@@ -338,7 +338,7 @@ final class Interceptor
         int $postId,
         mixed $jsonValue,
         array $subfields
-    ): void {
+    ): bool {
         global $wpdb;
 
         $decoded = is_string($jsonValue) ? json_decode($jsonValue, true) : $jsonValue;
@@ -361,7 +361,14 @@ final class Interceptor
         $wpdb->query("START TRANSACTION");
 
         // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-        $wpdb->query($wpdb->prepare("DELETE FROM `{$childTable}` WHERE `post_id` = %d", $postId));
+        $deleted = $wpdb->query($wpdb->prepare("DELETE FROM `{$childTable}` WHERE `post_id` = %d", $postId));
+
+        if ($deleted === false) {
+            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+            $wpdb->query("ROLLBACK");
+
+            return false;
+        }
 
         foreach ($decoded as $sortOrder => $row) {
             if (! is_array($row)) {
@@ -376,13 +383,29 @@ final class Interceptor
                 $formats[]   = is_numeric($row[$col] ?? '') && ! is_string($row[$col] ?? '') ? '%d' : '%s';
             }
 
-            $wpdb->insert($childTable, $data, $formats);
+            $inserted = $wpdb->insert($childTable, $data, $formats);
+
+            if ($inserted === false) {
+                // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+                $wpdb->query("ROLLBACK");
+
+                return false;
+            }
         }
 
         // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-        $wpdb->query("COMMIT");
+        $committed = $wpdb->query("COMMIT");
+
+        if ($committed === false) {
+            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+            $wpdb->query("ROLLBACK");
+
+            return false;
+        }
 
         // Invalidate repeater cache.
         wp_cache_delete($this->cache_key($childTable, $postId), Schema::CACHE_GROUP);
+
+        return true;
     }
 }

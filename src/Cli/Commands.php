@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace EnterpriseCPT\Cli;
 
 use EnterpriseCPT\Plugin;
+use EnterpriseCPT\Validation\DefinitionValidator;
 
 final class Commands
 {
@@ -46,19 +47,120 @@ final class Commands
         \WP_CLI::line(wp_json_encode($this->plugin->definitionSummary(), JSON_PRETTY_PRINT));
     }
 
+    /**
+     * Report runtime health signals for definitions, storage, templates, and sync workers.
+     *
+     * ## OPTIONS
+     *
+     * [--format=<format>]
+     * : Output format: table, json, csv (default: table).
+     *
+     * ## EXAMPLES
+     *
+     *     wp enterprise-cpt diagnostics
+     *     wp enterprise-cpt diagnostics --format=json
+     *
+     * @when after_wp_load
+     */
+    public function diagnostics(array $args, array $assocArgs): void
+    {
+        $format = in_array($assocArgs['format'] ?? 'table', ['table', 'json', 'csv'], true)
+            ? ($assocArgs['format'] ?? 'table')
+            : 'table';
+
+        $fieldGroups = $this->plugin->fieldGroupDefinitions();
+        $customGroups = array_values(array_filter(
+            $fieldGroups,
+            static fn (array $group): bool => sanitize_key((string) ($group['custom_table_name'] ?? '')) !== ''
+        ));
+        $missingTables = 0;
+
+        foreach ($customGroups as $group) {
+            $customTableName = sanitize_key((string) ($group['custom_table_name'] ?? ''));
+            $tableName = $this->plugin->storageSchema()->get_table_name($customTableName);
+
+            if ($this->plugin->tableManager()->rowCount($tableName) === null) {
+                $missingTables++;
+            }
+        }
+
+        $templateDirectory = $this->uploadTemplateDirectory();
+        $shadowSyncState = $this->shadowSyncState();
+        $rows = [
+            [
+                'area' => 'cpt_definitions',
+                'status' => $this->plugin->cptEngine()->is_readonly_env() ? 'read-only' : 'writable',
+                'detail' => sprintf('%d definition(s), %d buffered', count($this->plugin->postTypeDefinitions()), $this->optionCount('enterprise_cpt_buffer')),
+            ],
+            [
+                'area' => 'field_group_definitions',
+                'status' => $this->plugin->fieldGroupEngine()->is_readonly_env() ? 'read-only' : 'writable',
+                'detail' => sprintf('%d definition(s), %d buffered', count($fieldGroups), $this->optionCount('enterprise_cpt_field_group_buffer')),
+            ],
+            [
+                'area' => 'location_registry',
+                'status' => $this->optionCount('enterprise_cpt_location_registry_buffer') > 0 ? 'buffered' : 'file-backed',
+                'detail' => sprintf('%d buffered registry entrie(s)', $this->optionCount('enterprise_cpt_location_registry_buffer')),
+            ],
+            [
+                'area' => 'upload_templates',
+                'status' => $templateDirectory !== '' && (is_dir($templateDirectory) ? is_writable($templateDirectory) : is_writable(dirname($templateDirectory))) ? 'writable' : 'not-writable',
+                'detail' => $templateDirectory === '' ? 'upload directory unavailable' : $templateDirectory,
+            ],
+            [
+                'area' => 'custom_tables',
+                'status' => $missingTables === 0 ? 'ok' : 'missing-tables',
+                'detail' => sprintf('%d custom group(s), %d missing table(s)', count($customGroups), $missingTables),
+            ],
+            [
+                'area' => 'shadow_sync',
+                'status' => $shadowSyncState['status'],
+                'detail' => $shadowSyncState['detail'],
+            ],
+        ];
+
+        \WP_CLI\Utils\format_items($format, $rows, ['area', 'status', 'detail']);
+    }
+
+    /**
+     * Save a CPT definition from a JSON payload.
+     *
+     * ## OPTIONS
+     *
+     * <slug>
+     * : CPT slug to save.
+     *
+    * --definition=<definition-json>
+     * : CPT definition as a JSON object.
+     *
+     * ## EXAMPLES
+     *
+    *     wp enterprise-cpt save_cpt product --definition='{"args":{"label":"Products"}}'
+     *
+     * @when after_wp_load
+     */
     public function save_cpt(array $args, array $assocArgs): void
     {
         $slug = sanitize_key((string) ($args[0] ?? ''));
-        $json = (string) ($assocArgs['json'] ?? '');
+        $json = (string) ($assocArgs['definition'] ?? ($assocArgs['json'] ?? ''));
 
         if ($slug === '' || $json === '') {
-            \WP_CLI::error('Usage: wp enterprise-cpt save_cpt <slug> --json=<definition-json>');
+            \WP_CLI::error('Usage: wp enterprise-cpt save_cpt <slug> --definition=<definition-json>');
         }
 
         $decoded = json_decode($json, true);
 
         if (! is_array($decoded)) {
-            \WP_CLI::error('The provided --json value must decode to an object.');
+            \WP_CLI::error('The provided --definition value must decode to an object.');
+        }
+
+        $validationErrors = DefinitionValidator::validateCptDefinition($slug, $decoded);
+
+        if ($validationErrors !== []) {
+            \WP_CLI::error(wp_json_encode([
+                'message' => 'CPT definition failed validation.',
+                'fields' => $validationErrors,
+            ], JSON_PRETTY_PRINT));
         }
 
         $this->plugin->cptEngine()->save_definition($slug, $decoded);
@@ -153,6 +255,47 @@ final class Commands
     // -------------------------------------------------------------------------
     // Private migration helpers
     // -------------------------------------------------------------------------
+
+    private function optionCount(string $optionName): int
+    {
+        $value = get_option($optionName, []);
+
+        return is_array($value) ? count($value) : 0;
+    }
+
+    private function uploadTemplateDirectory(): string
+    {
+        $uploads = wp_get_upload_dir();
+        $baseDirectory = trailingslashit((string) ($uploads['basedir'] ?? ''));
+
+        if ($baseDirectory === '') {
+            return '';
+        }
+
+        return $baseDirectory . 'enterprise-cpt/templates';
+    }
+
+    /**
+     * @return array{status: string, detail: string}
+     */
+    private function shadowSyncState(): array
+    {
+        if (function_exists('as_next_scheduled_action')) {
+            $timestamp = as_next_scheduled_action('enterprise_cpt_shadow_sync', [0], 'enterprise-cpt');
+
+            return [
+                'status' => $timestamp === false ? 'not-scheduled' : 'scheduled',
+                'detail' => $timestamp === false ? 'Action Scheduler has no pending worker' : sprintf('Action Scheduler worker due at %s', gmdate('c', (int) $timestamp)),
+            ];
+        }
+
+        $timestamp = wp_next_scheduled('enterprise_cpt_shadow_sync', [0]);
+
+        return [
+            'status' => $timestamp === false ? 'not-scheduled' : 'scheduled',
+            'detail' => $timestamp === false ? 'WP-Cron has no pending worker' : sprintf('WP-Cron worker due at %s', gmdate('c', (int) $timestamp)),
+        ];
+    }
 
     private function migrate_forward(
         string $tableName,
