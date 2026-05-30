@@ -150,6 +150,36 @@ jobs:
             fi
           fi
 
+          if [ -f package.json ]; then
+            PACKAGE_VERSION="$(python3 -c "
+          import json
+          try:
+              print(json.load(open('package.json')).get('version', ''))
+          except Exception:
+              pass
+          " 2>/dev/null || true)"
+            if [ -n "${PACKAGE_VERSION}" ] && [ "${PACKAGE_VERSION}" != "${VERSION_FROM_HEADER}" ]; then
+              echo "::error file=package.json::package.json version '${PACKAGE_VERSION}' does not match plugin version '${VERSION_FROM_HEADER}'."
+              exit 1
+            fi
+          fi
+
+          if [ -f package-lock.json ]; then
+            LOCK_VERSION="$(python3 -c "
+          import json
+          try:
+              c = json.load(open('package-lock.json'))
+              root = c.get('packages', {}).get('', {})
+              print(root.get('version') or c.get('version', ''))
+          except Exception:
+              pass
+          " 2>/dev/null || true)"
+            if [ -n "${LOCK_VERSION}" ] && [ "${LOCK_VERSION}" != "${VERSION_FROM_HEADER}" ]; then
+              echo "::error file=package-lock.json::package-lock.json root version '${LOCK_VERSION}' does not match plugin version '${VERSION_FROM_HEADER}'."
+              exit 1
+            fi
+          fi
+
       # ---------------------------------------------------------------
       # Point 2 — Dynamic PHP version detection.
       #
@@ -341,6 +371,18 @@ jobs:
         run: |
           composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction
 
+      - name: Run release verification gate
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ -f package.json ]; then
+            npm run verify
+          elif [ -f composer.json ]; then
+            composer verify-php
+            composer schema:verify
+          fi
+
       - name: Validate required plugin files
         shell: bash
         run: |
@@ -427,6 +469,40 @@ jobs:
           fi
 
           rsync "${RSYNC_ARGS[@]}"
+
+          REQUIRED_PACKAGE_FILES=(
+            "enterprise-cpt.php"
+            "functions.php"
+            "readme.txt"
+            "src/Plugin.php"
+            "src/Support/Autoloader.php"
+            "templates/generic-block.php"
+            "assets/build/index/index.js"
+            "assets/build/editor/editor.js"
+            "assets/build/cpt-manager/cpt-manager.js"
+            "assets/build/blocks/blocks.js"
+          )
+
+          for required_file in "${REQUIRED_PACKAGE_FILES[@]}"; do
+            if [ ! -f "dist/${PLUGIN_SLUG}/${required_file}" ]; then
+              echo "::error::Release package is missing required runtime file '${required_file}'."
+              exit 1
+            fi
+          done
+
+          DISALLOWED_PACKAGE_PATHS=(
+            "assets/src"
+            "node_modules"
+            "tests"
+            ".github"
+          )
+
+          for disallowed_path in "${DISALLOWED_PACKAGE_PATHS[@]}"; do
+            if [ -e "dist/${PLUGIN_SLUG}/${disallowed_path}" ]; then
+              echo "::error::Release package includes development path '${disallowed_path}'. Check .distignore."
+              exit 1
+            fi
+          done
 
           cd dist
           zip -r "${ASSET_NAME}" "${PLUGIN_SLUG}"
