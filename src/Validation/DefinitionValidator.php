@@ -26,6 +26,14 @@ final class DefinitionValidator
         'user_role',
     ];
 
+    private const ALLOWED_MINIMUM_ROLES = [
+        'any',
+        'contributor',
+        'author',
+        'editor',
+        'administrator',
+    ];
+
     /**
      * @return list<array{path: string, code: string, message: string}>
      */
@@ -79,9 +87,37 @@ final class DefinitionValidator
 
         self::validateLocations($definition, $errors);
         self::validateLocationRules($definition['location_rules'] ?? [], $errors);
+        self::validatePermissions($definition['permissions'] ?? [], $errors);
         self::validateFields($definition['fields'] ?? [], 'fields', $errors);
 
         return $errors;
+    }
+
+    /**
+     * @param list<array{path: string, code: string, message: string}> $errors
+     */
+    private static function validatePermissions(mixed $permissions, array &$errors): void
+    {
+        if ($permissions === [] || $permissions === null) {
+            return;
+        }
+
+        if (! is_array($permissions)) {
+            $errors[] = self::error('permissions', 'invalid_permissions', 'Permissions must be an object.');
+            return;
+        }
+
+        $minimumRole = sanitize_key((string) ($permissions['minimum_role'] ?? 'any'));
+
+        if (! in_array($minimumRole, self::ALLOWED_MINIMUM_ROLES, true)) {
+            $errors[] = self::error('permissions.minimum_role', 'invalid_minimum_role', 'Minimum role is not supported.');
+        }
+
+        $customCapability = (string) ($permissions['custom_capability'] ?? '');
+
+        if ($customCapability !== '' && sanitize_key($customCapability) !== $customCapability) {
+            $errors[] = self::error('permissions.custom_capability', 'invalid_custom_capability', 'Custom capability must already be a normalized capability key.');
+        }
     }
 
     /**

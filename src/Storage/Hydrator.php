@@ -45,7 +45,14 @@ final class Hydrator
             return;
         }
 
-        $postIds = array_values(array_unique(array_map('intval', $postIds)));
+        $postIds = array_values(array_unique(array_filter(
+            array_map('intval', $postIds),
+            static fn (int $postId): bool => $postId > 0
+        )));
+
+        if ($postIds === []) {
+            return;
+        }
 
         // Group meta keys by their backing table.
         $tablePostIds = [];
@@ -92,7 +99,7 @@ final class Hydrator
             // Index fetched rows by post_id for O(1) lookup.
             $rowsByPostId = [];
 
-            foreach ($rows as $row) {
+            foreach (is_array($rows) ? $rows : [] as $row) {
                 $rowsByPostId[(int) $row['post_id']] = $row;
             }
 

@@ -8,7 +8,7 @@ This matrix is the Phase 1 reliability baseline. Run the automated checks before
 | --- | --- | --- |
 | JavaScript bundles | `npm run build` | All four WordPress Scripts builds compile successfully. |
 | PHP syntax | `composer verify-php` | No syntax errors across plugin PHP, tests, templates, build assets, and vendored PHP files. |
-| Schema smoke tests | `composer schema:verify` | Table naming, field group normalization, REST controller harness, definition validation, and storage safety checks pass. |
+| Schema smoke tests | `composer schema:verify` | Table naming, field group normalization, REST controller harness, definition validation, storage safety, runtime hydration, SSR template, and access-control checks pass. |
 | Full gate | `npm run verify` | Build, PHP syntax, and schema smoke tests all pass. |
 
 ## Manual WordPress Matrix
@@ -26,6 +26,13 @@ This matrix is the Phase 1 reliability baseline. Run the automated checks before
 | Storage schema migration | Add or change a custom-table field or repeater subfield, then reload WordPress or run activation. | Custom table and repeater child table columns are created without dropping existing data. | Storage signatures include a schema version and nested repeater row schemas. |
 | Repeater storage rollback | Save a repeater value while simulating a child-table write failure in a test/staging database. | The child-table replacement rolls back and cache remains untouched until a successful commit. | Covered by `tests/StorageTransactionSafetyTest.php`. |
 | Shadow sync drift check | Run `wp enterprise-cpt storage sync-check --group=<field-group-slug> --format=json`. | Reports no drift, or lists exact `post_id`/`meta_key` pairs where custom-table data differs from postmeta shadows. | Custom table data remains the source of truth. |
+| Runtime hydration | Load an archive or search result containing posts with custom-table backed fields. | Custom-table parent rows and repeater child rows are cache-warmed in one query per physical table. | Covered by `tests/HydratorRuntimeTest.php`; invalid/duplicate post IDs are ignored before SQL. |
+| SSR template fallback | Render a block preview with no theme/upload template, then with a generated upload template. | Missing templates use the plugin fallback; generated uploads templates render schema-aware default markup. | Covered by `tests/TemplateResolverRuntimeTest.php`. |
+| REST preview payload limits | Send a render-block request with oversized attributes. | Request fails with `enterprise_cpt_attributes_too_large` and HTTP 413 before template rendering. | Existing limit: 16 KB encoded attributes; cacheable limit: 8 KB attributes and 64 KB HTML. |
+| Representative query target | On small, medium, and large content models, run a loop query and render field-backed content. | Custom-table field access should avoid per-field/per-post N+1 reads after `the_posts` hydration. | Expected custom-table read shape: one parent-table query per table plus one child-table query per repeater table for cold caches. |
+| Block preview access | Render a block whose field group requires a custom capability the current user lacks. | Preview returns a 404-style missing block response and does not render template output. | Covered by `tests/RestControllerHarnessTest.php`; avoids disclosing restricted field groups. |
+| Meta write access | Register fields for a read-only field group, then attempt REST/core meta write authorization. | Reads are allowed for authorized users; `edit_post_meta` auth is denied for read-only or inaccessible groups. | Covered by `tests/FieldRegistrarSecurityTest.php`. |
+| Permission schema validation | Save field groups with malformed `minimum_role` or `custom_capability`. | Validation fails before persistence with stable field errors. | Unknown roles fail closed at runtime. |
 
 ## REST Endpoint Checklist
 
@@ -43,7 +50,7 @@ Use cookie authentication with an `X-WP-Nonce` created for `wp_rest` when checki
 | `/wp-json/enterprise-cpt/v1/search` | GET | `manage_options` | Supports `post_type`, `taxonomy`, and `user_role` lookups with bounded pagination. |
 | `/wp-json/enterprise-cpt/v1/field-groups/for-post-type/{post_type}` | GET | `edit_posts` | Returns post-editor-safe group payloads for the current user. |
 | `/wp-json/enterprise-cpt/v1/location-options` | GET | `manage_options` | Returns public post types, taxonomies, and user roles. |
-| `/wp-json/enterprise-cpt/v1/render-block` | GET/POST | `edit_posts` | Returns preview HTML for valid blocks; unknown blocks return a 404 payload; rate limits return 429. |
+| `/wp-json/enterprise-cpt/v1/render-block` | GET/POST | `edit_posts` plus field-group read access | Returns preview HTML for valid accessible blocks; unknown or forbidden blocks return a 404 payload; rate limits return 429. |
 
 ## Release Evidence
 
@@ -54,3 +61,11 @@ For each release candidate, capture:
 - Upgrade activation result from the previous release.
 - Diagnostics JSON summary.
 - Any manual matrix rows that were skipped and why.
+
+## Rollback Checklist
+
+- Restore the previous tagged `definitions/cpt` and `blocks/fields` JSON definitions before clearing buffers.
+- Inspect `enterprise_cpt_buffer`, `enterprise_cpt_field_group_buffer`, and `enterprise_cpt_location_registry_buffer` for admin edits made after the rollback target.
+- Export custom tables and postmeta shadows before rolling back storage code; schema upgrades are designed to be non-destructive, not automatically downgraded.
+- Run `wp enterprise-cpt storage sync-check --group=<field-group-slug> --format=json` for critical custom-table groups after rollback.
+- Review generated upload templates in `wp-content/uploads/enterprise-cpt/templates` because they can continue to override plugin fallback templates after code rollback.

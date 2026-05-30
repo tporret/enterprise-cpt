@@ -17,6 +17,6 @@
   },
   "scripts": {
     "verify-php": "find . -name '*.php' | xargs php -l",
-    "schema:verify": "php tests/SchemaTableNameTest.php && php tests/FieldGroupLocationNormalizationTest.php && php tests/RestControllerHarnessTest.php && php tests/DefinitionValidationTest.php && php tests/StorageTransactionSafetyTest.php && php tests/StorageSignatureTest.php"
+    "schema:verify": "php tests/SchemaTableNameTest.php && php tests/FieldGroupLocationNormalizationTest.php && php tests/RestControllerHarnessTest.php && php tests/DefinitionValidationTest.php && php tests/StorageTransactionSafetyTest.php && php tests/StorageSignatureTest.php && php tests/HydratorRuntimeTest.php && php tests/TemplateResolverRuntimeTest.php && php tests/FieldRegistrarSecurityTest.php"
   }
 }

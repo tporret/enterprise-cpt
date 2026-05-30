@@ -90,10 +90,10 @@ final class Plugin
         $this->cptEngine = new CPT(ENTERPRISE_CPT_PATH . 'definitions/cpt');
         $this->fieldGroupEngine = new FieldGroups(ENTERPRISE_CPT_PATH . 'blocks/fields');
         $this->permissionResolver = new PermissionResolver($this->fieldGroupEngine);
-        $this->fieldRegistrar = new FieldRegistrar();
+        $this->fieldRegistrar = new FieldRegistrar(null, $this->permissionResolver);
         $this->fieldGroupController = new FieldGroupController($this->fieldGroupEngine, $this->permissionResolver);
         $this->cptController = new CPTController($this->cptEngine, ENTERPRISE_CPT_PATH . 'definitions/cpt');
-        $this->blockRendererController = new BlockRendererController($this->fieldGroupEngine);
+        $this->blockRendererController = new BlockRendererController($this->fieldGroupEngine, $this->permissionResolver);
         $this->locationCompiler = new Compiler(
             $this->fieldGroupEngine,
             new RuleFactory(),
@@ -114,6 +114,7 @@ final class Plugin
         $this->tableManager = new TableManager($wpdb->prefix);
         $this->shadowSync   = new ShadowSync($metaKeyMap);
         $this->shadowSync->register();
+        $this->registerRuntimeHydration();
         $this->insights = new Insights($this);
         $this->fieldApi = new Field($this);
         $this->blockFactory = new BlockFactory($this->fieldGroupEngine);
@@ -394,6 +395,37 @@ final class Plugin
     public function syncBlockFieldsToCustomTable($preparedPost, $request)
     {
         return $preparedPost;
+    }
+
+    /**
+     * Prime custom-table storage caches for posts entering the main loop.
+     *
+     * @param array<int, mixed> $posts
+     * @return array<int, mixed>
+     */
+    public function hydratePosts(array $posts): array
+    {
+        $postIds = [];
+
+        foreach ($posts as $post) {
+            if ($post instanceof \WP_Post) {
+                $postIds[] = (int) $post->ID;
+                continue;
+            }
+
+            if (is_object($post) && isset($post->ID)) {
+                $postIds[] = (int) $post->ID;
+            }
+        }
+
+        $this->storageHydrator->hydrate_many($postIds);
+
+        return $posts;
+    }
+
+    private function registerRuntimeHydration(): void
+    {
+        add_filter('the_posts', [$this, 'hydratePosts'], 10, 1);
     }
 
     public function definitionSummary(): array

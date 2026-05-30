@@ -90,7 +90,7 @@ final class PermissionResolver
         $requiredRank = $rankMap[$minimumRole] ?? 0;
 
         if ($requiredRank === 0) {
-            return true;
+            return false;
         }
 
         $userRank = 0;

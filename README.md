@@ -110,7 +110,7 @@ Run the repository verification step:
 npm run verify
 ```
 
-`npm run verify` performs a full JavaScript build and then runs PHP linting via Composer.
+`npm run verify` performs a full JavaScript build, PHP linting, and the Composer schema/runtime/security smoke suite.
 
 ## Scripts
 
@@ -129,6 +129,7 @@ NPM scripts:
 Composer scripts:
 
 - `composer verify-php`
+- `composer schema:verify`
 
 ## REST Surface
 
@@ -156,6 +157,20 @@ The storage layer supports both standard post meta and custom-table storage.
 - Storage schema signatures include nested repeater rows so child-table migrations rerun after subfield edits
 - `TableManager` uses the active site prefix for multisite-safe table names
 - `Interceptor`, `Hydrator`, and `ShadowSync` keep custom-table reads and compatibility flows aligned
+- `Hydrator` primes custom-table caches on `the_posts` to avoid per-field/per-post reads during normal loops
+
+## Runtime Notes
+
+- Block previews enforce encoded attribute limits before template rendering
+- Generated upload templates render through schema-aware default markup, while missing templates fall back to `templates/generic-block.php`
+- Representative loop checks should show one custom-table parent query per table and one child-table query per repeater table on cold caches
+
+## Security Notes
+
+- Management REST endpoints require authenticated users with `manage_options`
+- Post-editor field-group payloads and block previews require `edit_posts` plus field-group read access
+- Field meta auth callbacks enforce group-level read/write access, including read-only groups
+- Unknown permission roles fail closed and malformed permission settings fail validation before persistence
 
 ## Block Rendering Contract
 
@@ -185,7 +200,22 @@ The default renderer is schema-aware for:
 - If a block fix appears correct in plugin templates but not on the live site, inspect uploads-based block templates first because they can override the plugin fallback.
 - Read-only file systems still work through option-buffer fallbacks, but write-path behavior should be tested explicitly.
 
-## Today's audit updates
+## Release Checklist
+
+- Keep `enterprise-cpt.php`, `readme.txt`, `package.json`, and `package-lock.json` version metadata aligned before tagging.
+- Run `npm run verify` and record the summary in release evidence.
+- Verify clean activation on a fresh WordPress site and upgrade activation from the previous tagged release.
+- Run `wp enterprise-cpt diagnostics --format=json` after activation and check definition, registry, upload template, custom table, and shadow sync status.
+- Confirm `assets/build` reflects the current `assets/src` sources.
+
+## Rollback Notes
+
+- JSON definitions in `definitions/cpt` and `blocks/fields` remain the primary rollback surface; restore the previous tagged files and clear matching option buffers only after confirming no newer admin edits should be preserved.
+- Read-only fallback buffers use `enterprise_cpt_buffer`, `enterprise_cpt_field_group_buffer`, and `enterprise_cpt_location_registry_buffer`.
+- Custom tables are not destructively downgraded. Before rollback, export custom table data and postmeta shadows, then run `wp enterprise-cpt storage sync-check --group=<field-group-slug> --format=json` on critical groups.
+- Generated upload templates under `wp-content/uploads/enterprise-cpt/templates` can override plugin fallback templates; remove or restore them when rolling back block rendering changes.
+
+## Recent Audit Updates
 
 - Refactored admin/editor inline layout styling into shared CSS classes and centralized styles in `assets/src/common/admin-style.css`.
 - Validated the full build with `npm run build` across `index`, `editor`, `cpt-manager`, and `blocks` bundles.

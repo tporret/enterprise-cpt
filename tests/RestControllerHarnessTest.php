@@ -136,6 +136,27 @@ if (! function_exists('get_current_user_id')) {
     }
 }
 
+if (! function_exists('user_can')) {
+    function user_can(int $userId, string $capability): bool
+    {
+        return in_array($capability, $GLOBALS['enterpriseCptRestHarnessUserCaps'] ?? [], true);
+    }
+}
+
+if (! function_exists('is_super_admin')) {
+    function is_super_admin(int $userId = 0): bool
+    {
+        return false;
+    }
+}
+
+if (! function_exists('get_userdata')) {
+    function get_userdata(int $userId): object|false
+    {
+        return (object) ['roles' => $GLOBALS['enterpriseCptRestHarnessUserRoles'] ?? ['administrator']];
+    }
+}
+
 if (! function_exists('get_current_blog_id')) {
     function get_current_blog_id(): int
     {
@@ -236,6 +257,8 @@ use EnterpriseCPT\Security\PermissionResolver;
 
 $enterpriseCptRestHarnessOptions = [];
 $enterpriseCptRestHarnessTransients = [];
+$enterpriseCptRestHarnessUserCaps = [];
+$enterpriseCptRestHarnessUserRoles = ['administrator'];
 
 function enterprise_cpt_rest_assert_true(bool $condition, string $message): void
 {
@@ -380,6 +403,31 @@ $renderResponse = $renderer->render_block(new WP_REST_Request([
 
 enterprise_cpt_rest_assert_true($renderResponse instanceof WP_REST_Response, 'missing block render should return a REST response.');
 enterprise_cpt_rest_assert_same(404, $renderResponse->get_status(), 'missing block render should return HTTP 404.');
+
+$fieldGroups->save_definition('restricted_block', [
+    'title' => 'Restricted Block',
+    'post_type' => 'post',
+    'is_block' => true,
+    'block_slug' => 'restricted-block',
+    'locations' => [
+        ['type' => 'post_type', 'values' => ['post']],
+    ],
+    'permissions' => [
+        'custom_capability' => 'enterprise_cpt_view_restricted',
+    ],
+    'fields' => [
+        ['type' => 'text', 'name' => 'headline'],
+    ],
+]);
+
+$restrictedRenderer = new BlockRendererController($fieldGroups, new PermissionResolver($fieldGroups));
+$restrictedResponse = $restrictedRenderer->render_block(new WP_REST_Request([
+    'block_name' => 'restricted-block',
+    'attributes' => ['headline' => 'Hidden'],
+]));
+
+enterprise_cpt_rest_assert_true($restrictedResponse instanceof WP_REST_Response, 'restricted block render should return a REST response.');
+enterprise_cpt_rest_assert_same(404, $restrictedResponse->get_status(), 'restricted block render should not disclose unauthorized field groups.');
 
 enterprise_cpt_rest_remove_tree($tempRoot);
 

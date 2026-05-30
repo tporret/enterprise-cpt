@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace EnterpriseCPT\Rest;
 
 use EnterpriseCPT\Engine\FieldGroups;
+use EnterpriseCPT\Security\AccessLevel;
+use EnterpriseCPT\Security\PermissionResolver;
 use EnterpriseCPT\Templates\Resolver;
 use WP_REST_Request;
 use WP_REST_Response;
@@ -28,9 +30,12 @@ final class BlockRendererController
 
     private FieldGroups $fieldGroups;
 
-    public function __construct(FieldGroups $fieldGroups)
+    private ?PermissionResolver $permissionResolver;
+
+    public function __construct(FieldGroups $fieldGroups, ?PermissionResolver $permissionResolver = null)
     {
         $this->fieldGroups = $fieldGroups;
+        $this->permissionResolver = $permissionResolver;
     }
 
     public function register_routes(): void
@@ -118,6 +123,21 @@ final class BlockRendererController
                 ],
                 404
             );
+        }
+
+        if ($this->permissionResolver !== null) {
+            $groupSlug = sanitize_key((string) ($group['name'] ?? ''));
+            $accessLevel = $this->permissionResolver->get_user_access_level($groupSlug, $userId);
+
+            if ($accessLevel === AccessLevel::NONE) {
+                return new WP_REST_Response(
+                    [
+                        'html' => '',
+                        'error' => 'Block not found.',
+                    ],
+                    404
+                );
+            }
         }
 
         $attributes = $this->sanitize_attributes_for_group($attributes, $group);

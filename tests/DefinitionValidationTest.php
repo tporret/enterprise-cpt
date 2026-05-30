@@ -71,6 +71,10 @@ $invalidFieldGroup['fields'] = [
     ['type' => 'text', 'name' => 'Bad Name!'],
     ['type' => 'select', 'name' => 'status', 'choices' => [['value' => 'active'], ['value' => 'active']]],
 ];
+$invalidFieldGroup['permissions'] = [
+    'minimum_role' => 'owner',
+    'custom_capability' => 'Bad Capability!',
+];
 
 $errors = DefinitionValidator::validateFieldGroupDefinition(
     'product_details',
@@ -93,6 +97,8 @@ enterprise_cpt_validation_assert_contains_code($errors, 'unsupported_field_type'
 enterprise_cpt_validation_assert_contains_code($errors, 'invalid_field_name', 'malformed field names should fail validation.');
 enterprise_cpt_validation_assert_contains_code($errors, 'duplicate_field_name', 'duplicate field names should fail validation.');
 enterprise_cpt_validation_assert_contains_code($errors, 'duplicate_choice_value', 'duplicate choice values should fail validation.');
+enterprise_cpt_validation_assert_contains_code($errors, 'invalid_minimum_role', 'unknown minimum roles should fail validation.');
+enterprise_cpt_validation_assert_contains_code($errors, 'invalid_custom_capability', 'malformed custom capabilities should fail validation.');
 
 $cptErrors = DefinitionValidator::validateCptDefinition('Product CPT!', ['args' => ['supports' => 'title']]);
 

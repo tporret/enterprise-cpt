@@ -5,7 +5,7 @@ Tags: custom post type, custom fields, gutenberg, metadata, performance
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 8.3
-Stable tag: 0.5.1
+Stable tag: 0.6.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -116,12 +116,20 @@ Example: A "Product Details" field group can appear on Post, Product, and Servic
 - Versioned storage signatures that include nested repeater row schemas
 - Postmeta shadow sync support for compatibility
 - Metadata interception + cache layer for reduced query overhead
+- Loop-time hydration for custom-table caches to avoid per-post/per-field read patterns
 
 = Frontend Output =
 
 - Shared rendering path for editor previews and frontend block output
+- SSR preview fallback for missing templates and generated upload templates
 - Repeater image fields render as actual images on frontend output
 - Repeater rows render as structured content for clearer output
+
+= Security =
+
+- Management REST routes require authenticated `manage_options` access
+- Block previews require `edit_posts` plus field-group read access
+- Registered post meta respects field-group read-only and custom capability settings
 
 = REST API =
 
@@ -180,6 +188,16 @@ Yes. A single field group can target multiple post types, taxonomies, or user ro
 Create a theme template at `wp-content/themes/your-theme/enterprise-cpt/blocks/{slug}.php`. If no theme template exists, the plugin can use an uploads scaffold or the built-in fallback renderer.
 
 == Changelog ==
+
+= 0.6.0 =
+
+- Added centralized CPT and field-group definition validation before REST, CLI, file-backed, and option-buffered saves reach persistence.
+- Added structured validation errors for invalid slugs, locations, fields, storage settings, block slugs, and permission settings.
+- Hardened custom-table storage with transaction-safe repeater child-table replacement, nested repeater storage signatures, and image storage alignment.
+- Added runtime custom-table cache hydration on normal post loops to reduce per-post field read patterns.
+- Improved server-rendered block preview reliability with payload limits and fallback template coverage.
+- Enforced field-group access for block previews and registered post meta auth callbacks, including read-only groups and custom capabilities.
+- Added verification coverage for validation, storage rollback, runtime hydration, SSR template fallback, and access control.
 
 = 0.5.1 =
 
@@ -242,6 +260,10 @@ Create a theme template at `wp-content/themes/your-theme/enterprise-cpt/blocks/{
 - Repeater frontend image rendering support
 
 == Upgrade Notice ==
+
+= 0.6.0 =
+
+Run the full verification matrix after upgrading from 0.5.1. This release tightens schema validation and field-group access checks, so malformed definitions or unknown permission roles that previously loaded permissively now fail validation or fail closed.
 
 = 0.1.0 =
 

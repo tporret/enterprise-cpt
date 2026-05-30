@@ -6,14 +6,19 @@ namespace EnterpriseCPT\Core;
 
 use EnterpriseCPT\DataEngines\RepeaterSchema;
 use EnterpriseCPT\FieldTypes\TextField;
+use EnterpriseCPT\Security\AccessLevel;
+use EnterpriseCPT\Security\PermissionResolver;
 
 final class FieldRegistrar
 {
     private TextField $textField;
 
-    public function __construct(?TextField $textField = null)
+    private ?PermissionResolver $permissionResolver;
+
+    public function __construct(?TextField $textField = null, ?PermissionResolver $permissionResolver = null)
     {
         $this->textField = $textField ?? new TextField();
+        $this->permissionResolver = $permissionResolver;
     }
 
     public function register(array $definitions): array
@@ -23,6 +28,7 @@ final class FieldRegistrar
         foreach ($definitions as $definition) {
             $fields = $definition['fields'] ?? [];
             $postTypes = $this->resolvePostTypes($definition);
+            $groupSlug = sanitize_key((string) ($definition['name'] ?? ''));
 
             if ($postTypes === [] || ! is_array($fields)) {
                 continue;
@@ -57,6 +63,8 @@ final class FieldRegistrar
                     if ($registrationArgs === null) {
                         continue;
                     }
+
+                    $registrationArgs['auth_callback'] = $this->buildAuthCallback($groupSlug);
 
                     register_post_meta($postType, $metaKey, $registrationArgs);
                     $registeredFields[] = $postType . ':' . $metaKey;
@@ -142,5 +150,31 @@ final class FieldRegistrar
             'sanitize_callback' => $sanitizeCallback,
             'auth_callback' => static fn (): bool => current_user_can('edit_posts'),
         ];
+    }
+
+    private function buildAuthCallback(string $groupSlug): callable
+    {
+        return function (mixed $allowed = null, string $metaKey = '', int $objectId = 0, int $userId = 0, string $cap = '') use ($groupSlug): bool {
+            if (! current_user_can('edit_posts')) {
+                return false;
+            }
+
+            if ($this->permissionResolver === null || $groupSlug === '') {
+                return true;
+            }
+
+            $resolvedUserId = $userId > 0 ? $userId : get_current_user_id();
+            $accessLevel = $this->permissionResolver->get_user_access_level($groupSlug, $resolvedUserId);
+
+            if ($accessLevel === AccessLevel::FULL) {
+                return true;
+            }
+
+            if ($accessLevel === AccessLevel::READ_ONLY) {
+                return $cap === 'read_post_meta';
+            }
+
+            return false;
+        };
     }
 }
